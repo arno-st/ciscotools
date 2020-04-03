@@ -228,7 +228,7 @@ function ciscotools_config_settings () {
 			"friendly_name" => "Default Password Name",
 			"description" => "This is default Password for the console access.",
 			"method" => "textbox_password",
-			"max_length" => 45
+			"max_length" => 45,
 			'default' => '',
 			),
 		'ciscotools_default_can_be_upgraded' => array(
