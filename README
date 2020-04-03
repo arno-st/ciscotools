@@ -1,0 +1,30 @@
+/*******************************************************************************
+
+    Author ......... Arno Streuli
+    Contact ........ astreuli@gmail.com
+    Home Site ...... http://cactiusers.org
+    Program ........ Cisco Tools for Cacti
+    Purpose ........ Add usefull tools for cisco device on cacti
+
+*******************************************************************************/
+
+----[ Purpose
+
+	This plugin give some tools to manage Cisco Device
+
+----[ Installation
+
+	To install the plugin, please refer to the Plugin Installation Documentation
+
+    
+----[ Possible Bugs?
+   
+	If you find a problem, let me know!!! http://bugs.cacti.net
+
+----[ Future Changes
+
+	Got any ideas or complaints, please e-mail me!
+
+----[ Changelog
+
+1.0.0 Add 3 fields: login, password, console type (ssh, telnet), and the upload of new IOS based a snmpSysObjId via tftp or snmp
