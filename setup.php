@@ -33,7 +33,12 @@ function plugin_ciscotools_install () {
     api_plugin_register_hook('ciscotools', 'device_action_execute', 'ciscotools_device_action_execute', 'setup.php');
     api_plugin_register_hook('ciscotools', 'device_action_prepare', 'ciscotools_device_action_prepare', 'setup.php');
 
-	api_plugin_register_realm('ciscotools', 'ciscotools.php', 'backup.php', 'Plugin -> Cisco Tools', 1);
+// Cisco Tools Tab ( backup,...)
+	api_plugin_register_hook('ciscotools', 'top_header_tabs', 'ciscotools_show_tab', 'ciscotools_tab.php');
+	api_plugin_register_hook('ciscotools', 'top_graph_header_tabs', 'ciscotools_show_tab', 'ciscotools_tab.php');
+	api_plugin_register_hook('ciscotools', 'draw_navigation_text', 'ciscotools_draw_navigation_text', 'ciscotools_tab.php'); // nav bar under console and graph tab
+
+	api_plugin_register_realm('ciscotools', 'ciscotools_tap.php,backup.php', 'Plugin -> Cisco Tools', 1);
 	
 	ciscotools_setup_tables();
 }
@@ -84,11 +89,12 @@ function ciscotools_setup_tables() {
 	include_once($config["library_path"] . "/database.php");
 
 // Device login/password and console type
-	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'login', 'type' => 'char(50)', 'NULL' => true, 'default' => ''));
-	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'password', 'type' => 'char(50)', 'NULL' => true, 'default' => ''));
+	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'login', 'type' => 'char(45)', 'NULL' => true, 'default' => ''));
+	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'password', 'type' => 'char(45)', 'NULL' => true, 'default' => ''));
 	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'console_type', 'type' => 'char(2)', 'NULL' => true, 'default' => ''));
 	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'can_be_upgraded', 'type' => 'char(2)', 'NULL' => true, 'default' => ''));
 	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'can_be_rebooted', 'type' => 'char(2)', 'NULL' => true, 'default' => ''));
+	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'do_backup', 'type' => 'char(2)', 'NULL' => true, 'default' => ''));
 	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'backup', 'type' => 'text', 'NULL' => true, 'default' => ''));
 
 /* table to keep diff information */
@@ -97,6 +103,7 @@ function ciscotools_setup_tables() {
 	$data['columns'][] = array('name' => 'host_id', 'type' => 'mediumint(8)', 'NULL' => false, 'default' => '0');
 	$data['columns'][] = array('name' => 'version', 'type' => 'mediumint(2)', 'NULL' => false, 'default' => '0');
 	$data['columns'][] = array('name' => 'diff', 'type' => 'text', 'NULL' => true);
+    $data['columns'][] = array('name' => 'datechange', 'type' => 'int(24)', 'NULL' => true);
 	$data['id'] = 'description';
 	$data['keys'][] = array('name' => 'host_id', 'columns' => 'host_id');
 	$data['keys'][] = array('name' => 'version', 'columns' => 'version');
@@ -145,7 +152,7 @@ function ciscotools_config_form () {
 				'method' => 'textbox',
 				'friendly_name' => 'Login name',
 				'description' => 'The Login Name for the Console Access.',
-				'max_length' => 50,
+				'max_length' => 45,
 				'value' => '|arg1:login|',
 				'default' => read_config_option('ciscotools_default_login'),
 			);
@@ -153,7 +160,7 @@ function ciscotools_config_form () {
 				'friendly_name' => 'Password',
 				'description' => 'Enter the Password for the Console Access.',
 				'method' => 'textbox_password',
-				'max_length' => 50,
+				'max_length' => 45,
 				'value' => '|arg1:password|',
 				'default' => read_config_option('ciscotools_default_password'),
 			);
@@ -214,14 +221,14 @@ function ciscotools_config_settings () {
 			"friendly_name" => "Default Login Name",
 			"description" => "This is default Login name for the console access.",
 			"method" => "textbox",
-			"max_length" => 50,
+			"max_length" => 45,
 			'default' => '',
 			),
 		'ciscotools_default_password' => array(
 			"friendly_name" => "Default Password Name",
 			"description" => "This is default Password for the console access.",
 			"method" => "textbox_password",
-			"max_length" => 50,
+			"max_length" => 45
 			'default' => '',
 			),
 		'ciscotools_default_can_be_upgraded' => array(
@@ -248,6 +255,20 @@ function ciscotools_config_settings () {
 			'method' => 'checkbox',
 			'default' => 'oon',
 			),
+		'ciscotools_retention' => array(
+			'friendly_name' => __('Retention Period', 'ciscotools'),
+			'description' => __('The number of days to retain old backups.', 'ciscotools'),
+			'method' => 'drop_array',
+			'default' => '30',
+			'array' => array(
+				'30'  => __('%d Month', 1, 'ciscotools'),
+				'60'  => __('%d Months', 2, 'ciscotools'),
+				'90'  => __('%d Months', 3, 'ciscotools'),
+				'120' => __('%d Months', 4, 'ciscotools'),
+				'180' => __('%d Months', 6, 'ciscotools'),
+				'365' => __('%d Year', 1, 'ciscotools')
+			)
+		),
 	);
 }
 
