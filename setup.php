@@ -21,7 +21,7 @@
  | http://www.cacti.net/                                                   |
  +-------------------------------------------------------------------------+
 */
-// test Github
+
 function plugin_ciscotools_install () {
 	api_plugin_register_hook('ciscotools', 'config_arrays', 'ciscotools_config_arrays', 'setup.php'); // array used by this plugin
 	api_plugin_register_hook('ciscotools', 'config_settings', 'ciscotools_config_settings', 'setup.php');
@@ -33,7 +33,7 @@ function plugin_ciscotools_install () {
     api_plugin_register_hook('ciscotools', 'device_action_execute', 'ciscotools_device_action_execute', 'setup.php');
     api_plugin_register_hook('ciscotools', 'device_action_prepare', 'ciscotools_device_action_prepare', 'setup.php');
 
-	api_plugin_register_realm('ciscotools', 'ciscotools.php', 'Plugin -> Cisco Tools', 1);
+	api_plugin_register_realm('ciscotools', 'ciscotools.php', 'backup.php', 'Plugin -> Cisco Tools', 1);
 	
 	ciscotools_setup_tables();
 }
@@ -63,7 +63,6 @@ function ciscotools_check_upgrade() {
 	$current = $version['version'];
 	$old     = read_config_option('plugin_ciscotools_version');
 	if ($current != $old) {
-		ciscotools_setup_tables();
 		
 		// Set the new version
 		db_execute("UPDATE plugin_config SET version='$current' WHERE directory='ciscotools'");
@@ -73,11 +72,16 @@ function ciscotools_check_upgrade() {
 			author='"  . $version['author'] . "', 
 			webpage='" . $version['homepage'] . "' 
 			WHERE directory='" . $version['name'] . "' ");
+	
+			if( $old < '1.0' ) {
+			}
 	}
 
 }
 
 function ciscotools_setup_tables() {
+	global $config;
+	include_once($config["library_path"] . "/database.php");
 
 // Device login/password and console type
 	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'login', 'type' => 'char(50)', 'NULL' => true, 'default' => ''));
@@ -85,6 +89,21 @@ function ciscotools_setup_tables() {
 	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'console_type', 'type' => 'char(2)', 'NULL' => true, 'default' => ''));
 	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'can_be_upgraded', 'type' => 'char(2)', 'NULL' => true, 'default' => ''));
 	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'can_be_rebooted', 'type' => 'char(2)', 'NULL' => true, 'default' => ''));
+	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'backup', 'type' => 'text', 'NULL' => true, 'default' => ''));
+
+/* table to keep diff information */
+	$data = array();
+	$data['columns'][] = array('name' => 'id', 'type' => 'mediumint(8)', 'NULL' => false, 'default' => '0');
+	$data['columns'][] = array('name' => 'host_id', 'type' => 'mediumint(8)', 'NULL' => false, 'default' => '0');
+	$data['columns'][] = array('name' => 'version', 'type' => 'mediumint(2)', 'NULL' => false, 'default' => '0');
+	$data['columns'][] = array('name' => 'diff', 'type' => 'text', 'NULL' => true);
+	$data['id'] = 'description';
+	$data['keys'][] = array('name' => 'host_id', 'columns' => 'host_id');
+	$data['keys'][] = array('name' => 'version', 'columns' => 'version');
+	$data['type'] = 'InnoDB';
+	$data['comment'] = 'Plugin ciscotoole - Table for diff in confgi change';
+	api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_backup', $data);
+
 }
 
 function plugin_ciscotools_version () {
@@ -140,7 +159,7 @@ function ciscotools_config_form () {
 			);
 			$fields_host_edit3['console_type'] = array(
 				'friendly_name' => 'Console Type',
-				'description' => 'What Type of Console Access do we have SSH or Telnet',
+				'description' => 'What Type of Console Access do we have SSH or Telnet.',
 				'method' => 'drop_array',
 				'value' => '|arg1:console_type|',
  			     "array" => $ciscotools_console_type,
@@ -148,17 +167,24 @@ function ciscotools_config_form () {
 			);
 			$fields_host_edit3['can_be_upgraded'] = array(
 				'friendly_name' => 'Can it be upgraded',
-				'description' => 'Enable if the device can be upgraded without human intervention',
+				'description' => 'Enable if the device can be upgraded without human intervention.',
 				'method' => 'checkbox',
 				'value' => '|arg1:can_be_upgraded|',
 				'default' => read_config_option('ciscotools_default_can_be_upgraded'),
 			);
 			$fields_host_edit3['can_be_rebooted'] = array(
 				'friendly_name' => 'Can it be rebooted after upgrade of the OS',
-				'description' => 'Enable if the device can be rebooted after the new OS is downloaded',
+				'description' => 'Enable if the device can be rebooted after the new OS is downloaded.',
 				'method' => 'checkbox',
 				'value' => '|arg1:can_be_rebooted|',
 				'default' => read_config_option('ciscotools_default_can_be_rebooted'),
+			);
+			$fields_host_edit3['do_backup'] = array(
+				'friendly_name' => 'Do we backup the config',
+				'description' => 'Enable if the device need to be backuped on change.',
+				'method' => 'checkbox',
+				'value' => '|arg1:do_backup|',
+				'default' => read_config_option('ciscotools_default_do_backup'),
 			);
 		}
 	}
@@ -216,6 +242,12 @@ function ciscotools_config_settings () {
 			'method' => 'checkbox',
 			'default' => 'off',
 			),
+		'ciscotools_default_do_backup' => array(
+			'friendly_name' => "Do we backup the config",
+			'description' => "Enable if the device need to be backuped on change.",
+			'method' => 'checkbox',
+			'default' => 'oon',
+			),
 	);
 }
 
@@ -264,6 +296,12 @@ function ciscotools_api_device_new($hostrecord_array) {
 		$hostrecord_array['can_be_rebooted'] = form_input_validate($_POST['can_be_rebooted'], 'can_be_rebooted', '', true, 3);
 	} else {
 		$hostrecord_array['can_be_rebooted'] = form_input_validate('', 'can_be_rebooted', '', true, 3);
+	}
+
+	if (isset($_POST['do_backup'])) {
+		$hostrecord_array['do_backup'] = form_input_validate($_POST['do_backup'], 'do_backup', '', true, 3);
+	} else {
+		$hostrecord_array['do_backup'] = form_input_validate('', 'do_backup', '', true, 3);
 	}
 
 	sql_save($hostrecord_array, 'host');
