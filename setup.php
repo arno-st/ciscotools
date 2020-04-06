@@ -40,7 +40,8 @@ function plugin_ciscotools_install () {
 	api_plugin_register_hook('ciscotools', 'top_graph_header_tabs', 'ciscotools_show_tab', 'ciscotools_tab.php');
 	api_plugin_register_hook('ciscotools', 'draw_navigation_text', 'ciscotools_draw_navigation_text', 'ciscotools_tab.php'); // nav bar under console and graph tab
 
-	api_plugin_register_realm('ciscotools', 'ciscotools_tap.php,backup.php', 'Plugin -> Cisco Tools', 1);
+	api_plugin_register_realm('ciscotools', 'upgrade.php', 'Plugin -> Upgrade', 1);
+	api_plugin_register_realm('ciscotools', 'ciscotools_tab.php,backup.php', 'Plugin -> Backups', 1);
 	
 	ciscotools_setup_tables();
 }
@@ -233,7 +234,7 @@ function ciscotools_config_settings () {
 			'default' => '',
 			),
 		'ciscotools_default_can_be_upgraded' => array(
-			'friendly_name' => 'Defualt Can it be upgraded',
+			'friendly_name' => 'Default Can it be upgraded',
 			'description' => 'Enable if the device can be upgraded without human intervention.',
 			'method' => 'checkbox',
 			'default' => 'on',

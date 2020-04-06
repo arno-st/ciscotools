@@ -23,7 +23,6 @@
 */
 
 
-include_once($config['base_path'] . '/include/auth.php');
 
 
 ?>

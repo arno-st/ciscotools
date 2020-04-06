@@ -1,7 +1,7 @@
 [info]
 name = ciscotools
 version = 1.0.0
-longname = Host Tools
+longname = Cisco Tools
 author = Arno Streuli
 email = astreuli@gmail.com
 homepage = http://www.cacti.net
