@@ -23,9 +23,7 @@
 */
 
 
-chdir('../../');
-
-include('./include/auth.php');
+include_once($config['base_path'] . '/include/auth.php');
 
 
 ?>

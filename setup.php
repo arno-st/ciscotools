@@ -22,6 +22,8 @@
  +-------------------------------------------------------------------------+
 */
 
+include_once($config['base_path'] . '/plugins/ciscotools/backup.php');
+
 function plugin_ciscotools_install () {
 	api_plugin_register_hook('ciscotools', 'config_arrays', 'ciscotools_config_arrays', 'setup.php'); // array used by this plugin
 	api_plugin_register_hook('ciscotools', 'config_settings', 'ciscotools_config_settings', 'setup.php');
@@ -95,7 +97,6 @@ function ciscotools_setup_tables() {
 	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'can_be_upgraded', 'type' => 'char(2)', 'NULL' => true, 'default' => ''));
 	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'can_be_rebooted', 'type' => 'char(2)', 'NULL' => true, 'default' => ''));
 	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'do_backup', 'type' => 'char(2)', 'NULL' => true, 'default' => ''));
-	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'backup', 'type' => 'text', 'NULL' => true, 'default' => ''));
 
 /* table to keep diff information */
 	$data = array();
@@ -331,31 +332,34 @@ function ciscotools_api_device_new($hostrecord_array) {
 }
 
 function ciscotools_device_action_array($device_action_array) {
-        $device_action_array['ciscotools_upgrade'] = __('Download new OS');
+	$device_action_array['ciscotools_upgrade'] = __('Download new OS');
+	$device_action_array['ciscotools_backup'] = __('Force Backup');
 
-        return $device_action_array;
+	return $device_action_array;
 }
 
 function ciscotools_device_action_execute($action) {
-        global $config;
+	global $config;
 
-        if ($action != 'ciscotools_upgrade' ) {
-                return $action;
-        }
+	if ($action != 'ciscotools_upgrade' || $action != 'ciscotools_backup') {
+		return $action;
+	}
 
-        $selected_items = sanitize_unserialize_selected_items(get_nfilter_request_var('selected_items'));
+	$selected_items = sanitize_unserialize_selected_items(get_nfilter_request_var('selected_items'));
 
-        if ($selected_items != false) {
-                if ($action == 'ciscotools_upgrade' ) {
-                        for ($i = 0; ($i < count($selected_items)); $i++) {
-				if ($action == 'ciscotools_upgrade') {
-					$dbquery = db_fetch_assoc("SELECT * FROM host WHERE id=".$selected_items[$i]);
-extdb_log("ciscotools_upgrade value: ".$selected_items[$i]." - ".print_r($dbquery[0])." - ".$dbquery[0]['description']."\n");
-					extenddb_api_device_new( $dbquery[0] );
-                                }
-                        }
-                 }
-        }
+	if ($selected_items != false) {
+		for ($i = 0; ($i < count($selected_items)); $i++) {
+			if ($action == 'ciscotools_upgrade') {
+				$dbquery = db_fetch_assoc("SELECT * FROM host WHERE id=".$selected_items[$i]);
+ciscotools_log("ciscotools_upgrade value: ".$selected_items[$i]." - ".print_r($dbquery[0])." - ".$dbquery[0]['description']."\n");
+				ciscotools_download_OS( $dbquery[0] );
+			} else if($action == 'ciscotools_backup') {
+				$dbquery = db_fetch_assoc("SELECT * FROM host WHERE id=".$selected_items[$i]);
+ciscotools_log("ciscotools_backup value: ".$selected_items[$i]." - ".print_r($dbquery[0])." - ".$dbquery[0]['description']."\n");
+				ciscotools_backup( $dbquery[0] );
+			}
+		}
+	}
 
         return $action;
 }
