@@ -25,6 +25,7 @@
 /* function called to do the backup of the device
 At the call we receive just the ID of the device.*/
 function ciscotools_backup( $device ) {
+ciscotools_log("ciscotools_backup value: ".$device);
 }
 
 

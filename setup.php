@@ -335,7 +335,7 @@ function ciscotools_device_action_array($device_action_array) {
 function ciscotools_device_action_execute($action) {
 	global $config;
 
-	if ($action != 'ciscotools_upgrade' || $action != 'ciscotools_backup') {
+	if ($action != 'ciscotools_upgrade' && $action != 'ciscotools_backup') {
 		return $action;
 	}
 
@@ -349,7 +349,6 @@ ciscotools_log("ciscotools_upgrade value: ".$selected_items[$i]." - ".print_r($d
 				ciscotools_download_OS( $dbquery[0] );
 			} else if($action == 'ciscotools_backup') {
 				$dbquery = db_fetch_cell("SELECT id FROM host WHERE id=".$selected_items[$i]);
-ciscotools_log("ciscotools_backup value: ".$selected_items[$i]." - ".$dbquery);
 				ciscotools_backup( $dbquery);
 			}
 		}
@@ -363,19 +362,23 @@ function ciscotools_device_action_prepare($save) {
 
         $action = $save['drp_action'];
 
-        if ($action != 'ciscotools_upgrade' ) {
+        if ($action != 'ciscotools_upgrade' && $action != 'ciscotools_backup') {
                 return $save;
         }
 
-        if ($action == 'ciscotools_upgrade' ) {
+        if ($action == 'ciscotools_upgrade') {
 			$action_description = 'Upgrade selected device';
-				print "<tr>
-                        <td colspan='2' class='even'>
-                                <p>" . __('Click \'Continue\' to %s on these Device(s)', $action_description) . "</p>
-                                <p><div class='itemlist'><ul>" . $save['host_list'] . "</ul></div></p>
-                        </td>
-                </tr>";
-        }
+		} else if ($action == 'ciscotools_backup') {
+			$action_description = 'Backup selected device';
+		}
+		
+		print "<tr>
+			<td colspan='2' class='even'>
+				<p>" . __('Click \'Continue\' to %s on these Device(s)', $action_description) . "</p>
+				<p><div class='itemlist'><ul>" . $save['host_list'] . "</ul></div></p>
+			</td>
+		</tr>";
+        
 }
 
 function ciscotools_log( $text ){
