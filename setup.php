@@ -233,28 +233,28 @@ function ciscotools_config_settings () {
 			'default' => '',
 			),
 		'ciscotools_default_can_be_upgraded' => array(
-			'friendly_name' => 'Can it be upgraded',
+			'friendly_name' => 'Defualt Can it be upgraded',
 			'description' => 'Enable if the device can be upgraded without human intervention.',
 			'method' => 'checkbox',
 			'default' => 'on',
 			),
 		'ciscotools_default_can_be_rebooted' => array(
-			'friendly_name' => "Can it be rebooted after upgrade of the OS",
+			'friendly_name' => "Default Can it be rebooted after upgrade of the OS",
 			'description' => "Enable if the device can be rebooted after the new OS is downloaded.",
 			"method" => 'checkbox',
 			"default" => 'off',
+			),
+		'ciscotools_default_do_backup' => array(
+			'friendly_name' => "Default Do we backup the config",
+			'description' => "Enable if the device need to be backuped on change.",
+			'method' => 'checkbox',
+			'default' => 'oon',
 			),
 		'ciscotools_default_upgrade_type' => array(
 			'friendly_name' => "Enable Console access instead of SNMP",
 			'description' => "We use SNMP command to upload the upgrade by default, enable to use console and tftp instead.",
 			'method' => 'checkbox',
 			'default' => 'off',
-			),
-		'ciscotools_default_do_backup' => array(
-			'friendly_name' => "Do we backup the config",
-			'description' => "Enable if the device need to be backuped on change.",
-			'method' => 'checkbox',
-			'default' => 'oon',
 			),
 		'ciscotools_retention' => array(
 			'friendly_name' => __('Retention Period', 'ciscotools'),
