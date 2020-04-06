@@ -23,6 +23,7 @@
 */
 
 include_once($config['base_path'] . '/plugins/ciscotools/backup.php');
+include_once($config['base_path'] . '/plugins/ciscotools/upgrade.php');
 
 function plugin_ciscotools_install () {
 	api_plugin_register_hook('ciscotools', 'config_arrays', 'ciscotools_config_arrays', 'setup.php'); // array used by this plugin
@@ -258,18 +259,10 @@ function ciscotools_config_settings () {
 			'default' => 'off',
 			),
 		'ciscotools_retention' => array(
-			'friendly_name' => __('Retention Period', 'ciscotools'),
-			'description' => __('The number of days to retain old backups.', 'ciscotools'),
-			'method' => 'drop_array',
-			'default' => '30',
-			'array' => array(
-				'30'  => __('%d Month', 1, 'ciscotools'),
-				'60'  => __('%d Months', 2, 'ciscotools'),
-				'90'  => __('%d Months', 3, 'ciscotools'),
-				'120' => __('%d Months', 4, 'ciscotools'),
-				'180' => __('%d Months', 6, 'ciscotools'),
-				'365' => __('%d Year', 1, 'ciscotools')
-			)
+			'friendly_name' => 'IP address TFTP',
+			'description' => 'IP address of the TFTP server (IPv4 or IPv6)',
+			'method' => 'textbox',
+			'default' => '0.0.0.0'
 		),
 	);
 }
@@ -355,9 +348,9 @@ function ciscotools_device_action_execute($action) {
 ciscotools_log("ciscotools_upgrade value: ".$selected_items[$i]." - ".print_r($dbquery[0])." - ".$dbquery[0]['description']."\n");
 				ciscotools_download_OS( $dbquery[0] );
 			} else if($action == 'ciscotools_backup') {
-				$dbquery = db_fetch_assoc("SELECT * FROM host WHERE id=".$selected_items[$i]);
-ciscotools_log("ciscotools_backup value: ".$selected_items[$i]." - ".print_r($dbquery[0])." - ".$dbquery[0]['description']."\n");
-				ciscotools_backup( $dbquery[0] );
+				$dbquery = db_fetch_cell("SELECT id FROM host WHERE id=".$selected_items[$i]);
+ciscotools_log("ciscotools_backup value: ".$selected_items[$i]." - ".$dbquery);
+				ciscotools_backup( $dbquery);
 			}
 		}
 	}

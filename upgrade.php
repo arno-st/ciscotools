@@ -1,7 +1,7 @@
 <?php
 /*
  +-------------------------------------------------------------------------+
- | Copyright (C) 2007-2017 The Cacti Group                                 |
+ | Copyright (C) 2007 The Cacti Group                                      |
  |                                                                         |
  | This program is free software; you can redistribute it and/or           |
  | modify it under the terms of the GNU General Public License             |
@@ -22,10 +22,9 @@
  +-------------------------------------------------------------------------+
 */
 
-/* function called to do the backup of the device
-At the call we receive just the ID of the device.*/
-function ciscotools_backup( $device ) {
-}
 
+function ciscotools_download_OS( $dbquery ) {
+    
+}
 
 ?>
