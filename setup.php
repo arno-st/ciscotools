@@ -37,8 +37,8 @@ function plugin_ciscotools_install () {
     api_plugin_register_hook('ciscotools', 'device_action_prepare', 'ciscotools_device_action_prepare', 'setup.php');
 
 // Cisco Tools Tab ( backup,...)
-	api_plugin_register_hook('ciscotools', 'top_header_tabs', 'ciscotools_show_tab', 'ciscotools_tab.php');
-	api_plugin_register_hook('ciscotools', 'top_graph_header_tabs', 'ciscotools_show_tab', 'ciscotools_tab.php');
+	api_plugin_register_hook('ciscotools', 'top_header_tabs', 'ciscotools_show_tab', 'ciscotools_tab.php'); // display when into conosle tab
+	api_plugin_register_hook('ciscotools', 'top_graph_header_tabs', 'ciscotools_show_tab', 'ciscotools_tab.php'); // display when clicked tabs
 	api_plugin_register_hook('ciscotools', 'draw_navigation_text', 'ciscotools_draw_navigation_text', 'ciscotools_tab.php'); // nav bar under console and graph tab
 
 	api_plugin_register_realm('ciscotools', 'upgrade.php', 'Plugin -> Upgrade', 1);

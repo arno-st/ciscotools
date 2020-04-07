@@ -24,19 +24,25 @@
 
 function ciscotools_show_tab () {
 	global $config;
-	include_once($config["library_path"] . "/database.php");
 
-	if (api_user_realm_auth('backup.php')) {
-		if (!substr_count($_SERVER["REQUEST_URI"], "backup.php")) {
-			print '<a href="' . $config['url_path'] . 'plugins/ciscotools/backup.php"><img src="' . $config['url_path'] . 'plugins/ciscotools/images/tab_discover.gif" alt="CiscoTools" align="absmiddle" border="0"></a>';
-		}else{
-			print '<a href="' . $config['url_path'] . 'plugins/ciscotools/backup.php"><img src="' . $config['url_path'] . 'plugins/ciscotools/images/tab_discover_down.gif" alt="CiscoTools" align="absmiddle" border="0"></a>';
+	if (api_user_realm_auth('ciscotools_tab.php') || api_user_realm_auth('backup.php')) {
+		$cp = false;
+		if (get_current_page() == 'ciscotools_tab.php' || get_current_page() == 'backup.php') {
+			$cp = true;
 		}
+		print '<a href="' . $config['url_path'] . 'plugins/ciscotools/ciscotools_tab.php"><img src="' . $config['url_path'] . 'plugins/ciscotools/images/ciscotools' . ($cp ? '_down': '') . '.gif" alt="CiscoTools" align="absmiddle" border="0"></a>';
 	}
 	
 }
 
 function ciscotools_draw_navigation_text ($nav) {
+
+	$nav['ciscotools_tab.php:'] = array(
+		'title' => __('Cisco Tools', 'ciscotools'),
+		'mapping' => 'index.php:',
+		'url' => 'ciscotools_tab.php',
+		'level' => '1'
+	);
 	$nav['backup.php:'] = array(
 		'title' => __('Backup', 'ciscotools'),
 		'mapping' => 'index.php:',
