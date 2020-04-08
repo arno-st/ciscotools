@@ -37,9 +37,9 @@ function plugin_ciscotools_install () {
     api_plugin_register_hook('ciscotools', 'device_action_prepare', 'ciscotools_device_action_prepare', 'setup.php');
 
 // Cisco Tools Tab ( backup,...)
-	api_plugin_register_hook('ciscotools', 'top_header_tabs', 'ciscotools_show_tab', 'ciscotools_tab.php'); // display when into conosle tab
-	api_plugin_register_hook('ciscotools', 'top_graph_header_tabs', 'ciscotools_show_tab', 'ciscotools_tab.php'); // display when clicked tabs
-	api_plugin_register_hook('ciscotools', 'draw_navigation_text', 'ciscotools_draw_navigation_text', 'ciscotools_tab.php'); // nav bar under console and graph tab
+	api_plugin_register_hook('ciscotools', 'top_header_tabs', 'ciscotools_show_tab', 'setup.php'); // display when into conosle tab
+	api_plugin_register_hook('ciscotools', 'top_graph_header_tabs', 'ciscotools_show_tab', 'setup.php'); // display when clicked tabs
+	api_plugin_register_hook('ciscotools', 'draw_navigation_text', 'ciscotools_draw_navigation_text', 'setup.php'); // nav bar under console and graph tab
 
 	api_plugin_register_realm('ciscotools', 'upgrade.php', 'Plugin -> Upgrade', 1);
 	api_plugin_register_realm('ciscotools', 'ciscotools_tab.php,backup.php', 'Plugin -> Backups', 1);
@@ -379,6 +379,41 @@ function ciscotools_device_action_prepare($save) {
 			</td>
 		</tr>";
         
+}
+
+
+function ciscotools_show_tab () {
+	global $config;
+
+	if (api_user_realm_auth('ciscotools_tab.php') ) {
+		$cp = false;
+		if (get_current_page() == 'ciscotools_tab.php') {
+			$cp = true;
+		}
+		print '<a href="' . $config['url_path'] . 'plugins/ciscotools/ciscotools_tab.php"><img src="' . $config['url_path'] . 'plugins/ciscotools/images/ciscotools' . ($cp ? '_down': '') . '.gif" alt="Cisco Tools" align="absmiddle" border="0"></a>';
+	}
+	
+}
+
+function ciscotools_draw_navigation_text ($nav) {
+	global $config;
+
+	$nav['ciscotools_tab.php:backup'] = array(
+		'title' => __('Backup', 'ciscotools'),
+		'mapping' => 'index.php:,ciscotools_tab.php:',
+		'url' => 'ciscotools_tab.php',
+		'level' => '1'
+	);
+
+	
+	$nav['ciscotools_tab.php:diff'] = array(
+		'title' => __('Diff', 'ciscotools'),
+		'mapping' => 'index.php:,ciscotools_tab.php:',
+		'url' => 'ciscotools_tab.php',
+		'level' => '1'
+	);
+
+	return $nav;
 }
 
 function ciscotools_log( $text ){

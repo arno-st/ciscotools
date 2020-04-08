@@ -39,7 +39,7 @@ $snmpgetcopystatus          = $snmpsetcopyentry.".14"; // ccCopyEntryRowStatus
 
 /* function called to do the backup of the device
 At the call we receive just the ID of the device.*/
-function ciscotools_backup( $device ) {
+function ciscotools_backup($device=1) {
 /* retreive information from Cacti DB, name, and IP of the device */
 	$dbquery = db_fetch_row_prepared("SELECT description, hostname FROM host WHERE id=?", array($device));
 ciscotools_log("ciscotools_backup value: ".$dbquery['description']);
@@ -47,5 +47,7 @@ ciscotools_log("ciscotools_backup value: ".$dbquery['description']);
 
 }
 
+function ciscotools_diff($device=1) {
+}
 
 ?>

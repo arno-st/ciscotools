@@ -21,34 +21,98 @@
  | http://www.cacti.net/                                                   |
  +-------------------------------------------------------------------------+
 */
+chdir('../../');
+include_once('./include/auth.php');
 
-function ciscotools_show_tab () {
+include_once($config['base_path'] . '/plugins/ciscotools/backup.php');
+
+set_default_action('backup');
+
+switch(get_request_var('action')) {
+	case 'ajax_hosts':
+
+		break;
+	case 'ajax_hosts_noany':
+
+		break;
+	case 'backup':
+		general_header();
+		ciscotools_tabs();
+		ciscotools_backup();
+		bottom_footer();
+
+		break;
+	case 'diff':
+		general_header();
+		ciscotools_tabs();
+		ciscotools_diff();
+		bottom_footer();
+
+		exit;
+	default:
+		general_header();
+		ciscotools_tabs();
+		bottom_footer();
+		break;
+}
+
+function ciscotools_tabs() {
 	global $config;
 
-	if (api_user_realm_auth('ciscotools_tab.php') || api_user_realm_auth('backup.php')) {
-		$cp = false;
-		if (get_current_page() == 'ciscotools_tab.php' || get_current_page() == 'backup.php') {
-			$cp = true;
+	/* present a tabbed interface */
+	$tabs = array(
+		'backup'    => __('Backup', 'ciscotools'),
+		'diff'      => __('Diff', 'ciscotools')
+	);
+
+	get_filter_request_var('tab', FILTER_VALIDATE_REGEXP, array('options' => array('regexp' => '/^([a-zA-Z]+)$/')));
+
+	load_current_session_value('tab', 'sess_ciscotools_tab', 'general');
+	$current_tab = get_request_var('action');
+
+	/* draw the tabs */
+	print "<div class='tabs'><nav><ul>\n";
+
+	if (sizeof($tabs)) {
+		foreach (array_keys($tabs) as $tab_short_name) {
+			print "<li><a class='tab" . (($tab_short_name == $current_tab) ? " selected'" : "'") .
+				" href='" . htmlspecialchars($config['url_path'] .
+				'plugins/ciscotools/ciscotools_tab.php?' .
+				'action=' . $tab_short_name) .
+				"'>" . $tabs[$tab_short_name] . "</a></li>\n";
 		}
-		print '<a href="' . $config['url_path'] . 'plugins/ciscotools/ciscotools_tab.php"><img src="' . $config['url_path'] . 'plugins/ciscotools/images/ciscotools' . ($cp ? '_down': '') . '.gif" alt="CiscoTools" align="absmiddle" border="0"></a>';
 	}
-	
+
+	print "</ul></nav></div>\n";
 }
 
-function ciscotools_draw_navigation_text ($nav) {
+html_start_box(__('Cisco Tools', 'ciscotools'), '100%', '', '3', 'center', 'ciscotools_tab.php');
+?>
 
-	$nav['ciscotools_tab.php:'] = array(
-		'title' => __('Cisco Tools', 'ciscotools'),
-		'mapping' => 'index.php:',
-		'url' => 'ciscotools_tab.php',
-		'level' => '1'
-	);
-	$nav['backup.php:'] = array(
-		'title' => __('Backup', 'ciscotools'),
-		'mapping' => 'index.php:',
-		'url' => 'backup.php',
-		'level' => '1'
-	);
+<meta charset="utf-8"/>
+	<td class="noprint">
+	<form style="padding:0px;margin:0px;" name="form" method="get" action="<?php print $config['url_path'];?>plugins/ciscotools/ciscotools_map.php">
+		<table width="100%" cellpadding="0" cellspacing="0">
+			<tr class="noprint">
+				<td nowrap style='white-space: nowrap;' width="1">
+					&nbsp;Description :&nbsp;
+				</td>
+				<td width="1">
+					<input type="text" name="description" size="25" value="<?php print get_request_var_request("description");?>">
+				</td>
+				<td nowrap style='white-space: nowrap;'>
+					<input type="submit" value="Go" title="Set/Refresh Filters">
+					<input type='button' value="Clear" id='clear' onClick='clearFilter()' title="Reset fields to defaults">
+				</td>
+			</tr>
+		</table>
+	</form>
+	</td>
+</tr>
 
-	return $nav;
-}
+<?php
+
+html_end_box(false);
+
+
+?>
