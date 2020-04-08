@@ -93,8 +93,8 @@ function ciscotools_setup_tables() {
 	include_once($config["library_path"] . "/database.php");
 
 // Device login/password and console type
-	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'login', 'type' => 'char(45)', 'NULL' => true, 'default' => ''));
-	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'password', 'type' => 'char(45)', 'NULL' => true, 'default' => ''));
+	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'login', 'type' => 'char(20)', 'NULL' => true,  'default' => ''));
+	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'password', 'type' => 'char(20)', 'NULL' => true, 'default' => ''));
 	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'console_type', 'type' => 'char(2)', 'NULL' => true, 'default' => ''));
 	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'can_be_upgraded', 'type' => 'char(2)', 'NULL' => true, 'default' => ''));
 	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'can_be_rebooted', 'type' => 'char(2)', 'NULL' => true, 'default' => ''));
@@ -102,16 +102,18 @@ function ciscotools_setup_tables() {
 
 /* table to keep diff information */
 	$data = array();
-	$data['columns'][] = array('name' => 'id', 'type' => 'mediumint(8)', 'NULL' => false, 'default' => '0');
+	$data['columns'][] = array('name' => 'id', 'type' => 'mediumint(8)', 'auto_increment'=>'');
 	$data['columns'][] = array('name' => 'host_id', 'type' => 'mediumint(8)', 'NULL' => false, 'default' => '0');
-	$data['columns'][] = array('name' => 'version', 'type' => 'mediumint(2)', 'NULL' => false, 'default' => '0');
-	$data['columns'][] = array('name' => 'diff', 'type' => 'text', 'NULL' => true);
-    $data['columns'][] = array('name' => 'datechange', 'type' => 'int(24)', 'NULL' => true);
-	$data['id'] = 'description';
+	$data['columns'][] = array('name' => 'version', 'type' => 'mediumint(2)', 'NULL' => true, 'default' => '0');
+	$data['columns'][] = array('name' => 'diff', 'type' => 'text', 'NULL' => false);
+    $data['columns'][] = array('name' => 'datechange', 'type' => 'int(24)', 'NULL' => false);
+	$data['primary'] = 'id';
+	$data['keys'][] = array('name' => 'id', 'columns' => 'id');
 	$data['keys'][] = array('name' => 'host_id', 'columns' => 'host_id');
 	$data['keys'][] = array('name' => 'version', 'columns' => 'version');
+	$data['keys'][] = array('name' => 'datechange', 'columns' => 'datechange');
 	$data['type'] = 'InnoDB';
-	$data['comment'] = 'Plugin ciscotoole - Table for diff in confgi change';
+	$data['comment'] = 'Plugin ciscotoole - Table for diff in config change';
 	api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_backup', $data);
 
 }
@@ -155,7 +157,7 @@ function ciscotools_config_form () {
 				'method' => 'textbox',
 				'friendly_name' => 'Login name',
 				'description' => 'The Login Name for the Console Access.',
-				'max_length' => 45,
+				'max_length' => 20,
 				'value' => '|arg1:login|',
 				'default' => read_config_option('ciscotools_default_login'),
 			);
@@ -163,7 +165,7 @@ function ciscotools_config_form () {
 				'friendly_name' => 'Password',
 				'description' => 'Enter the Password for the Console Access.',
 				'method' => 'textbox_password',
-				'max_length' => 45,
+				'max_length' => 20,
 				'value' => '|arg1:password|',
 				'default' => read_config_option('ciscotools_default_password'),
 			);
@@ -346,7 +348,7 @@ function ciscotools_device_action_execute($action) {
 			if ($action == 'ciscotools_upgrade') {
 				$dbquery = db_fetch_assoc("SELECT * FROM host WHERE id=".$selected_items[$i]);
 ciscotools_log("ciscotools_upgrade value: ".$selected_items[$i]." - ".print_r($dbquery[0])." - ".$dbquery[0]['description']."\n");
-				ciscotools_download_OS( $dbquery[0] );
+				ciscotools_download_OS( $dbquery );
 			} else if($action == 'ciscotools_backup') {
 				$dbquery = db_fetch_cell("SELECT id FROM host WHERE id=".$selected_items[$i]);
 				ciscotools_backup( $dbquery);
