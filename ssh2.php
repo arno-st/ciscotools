@@ -54,4 +54,27 @@ function close_ssh($connection) {
     ssh2_disconnect ($connection);
 }
 
+function ssh_read_stream($connection, $cmd) {
+    $execSSH = ssh2_exec($connection, $cmd);
+    stream_set_blocking($execSSH, true);
+    $stream_out = ssh2_fetch_stream($execSSH, SSH2_STREAM_STDIO);
+    $output = stream_get_contents($execSSH);
+    if($output) {
+        return $output;
+    }
+    else {
+        ciscotools_log("cmdSSH - Error - No output");
+        return false;
+    }
+}
+
+/* OLD FUNCTION
+function ssh_read_stream( $connection, $cmd ) {
+    $stream = ssh2_shell($connection);
+    fwrite( $stream, $cmd);
+    sleep(1);
+    $stream = ssh2_exec($connection, $cmd);
+    stream_set_blocking( $stream, true );
+*/
+
 ?>

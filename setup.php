@@ -93,12 +93,12 @@ function ciscotools_setup_tables() {
 	include_once($config["library_path"] . "/database.php");
 
 // Device login/password and console type
-	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'login', 'type' => 'char(20)', 'NULL' => true,  'default' => ''));
-	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'password', 'type' => 'char(20)', 'NULL' => true, 'default' => ''));
-	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'console_type', 'type' => 'char(2)', 'NULL' => true, 'default' => ''));
-	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'can_be_upgraded', 'type' => 'char(2)', 'NULL' => true, 'default' => ''));
-	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'can_be_rebooted', 'type' => 'char(2)', 'NULL' => true, 'default' => ''));
-	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'do_backup', 'type' => 'char(2)', 'NULL' => true, 'default' => ''));
+	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'login', 'type' => 'varchar(20)', 'NULL' => true,  'default' => ''));
+	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'password', 'type' => 'varchar(20)', 'NULL' => true, 'default' => ''));
+	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'console_type', 'type' => 'varchar(2)', 'NULL' => true, 'default' => ''));
+	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'can_be_upgraded', 'type' => 'varchar(2)', 'NULL' => true, 'default' => ''));
+	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'can_be_rebooted', 'type' => 'varchar(2)', 'NULL' => true, 'default' => ''));
+	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'do_backup', 'type' => 'varchar(2)', 'NULL' => true, 'default' => ''));
 
 /* table to keep diff information */
 	$data = array();
@@ -106,7 +106,7 @@ function ciscotools_setup_tables() {
 	$data['columns'][] = array('name' => 'host_id', 'type' => 'mediumint(8)', 'NULL' => false, 'default' => '0');
 	$data['columns'][] = array('name' => 'version', 'type' => 'mediumint(2)', 'NULL' => true, 'default' => '0');
 	$data['columns'][] = array('name' => 'diff', 'type' => 'text', 'NULL' => false);
-    $data['columns'][] = array('name' => 'datechange', 'type' => 'int(24)', 'NULL' => false);
+    $data['columns'][] = array('name' => 'datechange', 'type' => 'varchar(24)', 'NULL' => false);
 	$data['primary'] = 'id';
 	$data['keys'][] = array('name' => 'id', 'columns' => 'id');
 	$data['keys'][] = array('name' => 'host_id', 'columns' => 'host_id');
@@ -213,52 +213,52 @@ function ciscotools_config_settings () {
 	$settings['Cisco Tools'] = array(
 		"linkdiscovery_general_header" => array(
 			"friendly_name" => "General",
-			"method" => "spacer",
+			"method" => "spacer"
 			),
 		"ciscotools_default_console_type" => array(
 			"friendly_name" => "Default Console Type",
 			"description" => "This is default console type SSH or Telnet.",
 			"method" => "drop_array",
 			"array" => $ciscotools_console_type,
-			'default' => '0',
+			'default' => '0'
 			),
 		"ciscotools_default_login" => array(
 			"friendly_name" => "Default Login Name",
 			"description" => "This is default Login name for the console access.",
 			"method" => "textbox",
 			"max_length" => 45,
-			'default' => '',
+			'default' => ''
 			),
 		'ciscotools_default_password' => array(
 			"friendly_name" => "Default Password Name",
 			"description" => "This is default Password for the console access.",
 			"method" => "textbox_password",
 			"max_length" => 45,
-			'default' => '',
+			'default' => ''
 			),
 		'ciscotools_default_can_be_upgraded' => array(
 			'friendly_name' => 'Default Can it be upgraded',
 			'description' => 'Enable if the device can be upgraded without human intervention.',
 			'method' => 'checkbox',
-			'default' => 'on',
+			'default' => 'on'
 			),
 		'ciscotools_default_can_be_rebooted' => array(
 			'friendly_name' => "Default Can it be rebooted after upgrade of the OS",
 			'description' => "Enable if the device can be rebooted after the new OS is downloaded.",
 			"method" => 'checkbox',
-			"default" => 'off',
+			"default" => 'off'
 			),
 		'ciscotools_default_do_backup' => array(
 			'friendly_name' => "Default Do we backup the config",
 			'description' => "Enable if the device need to be backuped on change.",
 			'method' => 'checkbox',
-			'default' => 'oon',
+			'default' => 'on'
 			),
 		'ciscotools_default_upgrade_type' => array(
 			'friendly_name' => "Enable Console access instead of SNMP",
 			'description' => "We use SNMP command to upload the upgrade by default, enable to use console and tftp instead.",
 			'method' => 'checkbox',
-			'default' => 'off',
+			'default' => 'off'
 			),
 		'ciscotools_retention' => array(
 			'friendly_name' => 'IP address TFTP',
@@ -266,6 +266,12 @@ function ciscotools_config_settings () {
 			'method' => 'textbox',
 			'default' => '0.0.0.0'
 		),
+		'ciscotools_log_debug' => array(
+			'friendly_name' => 'Debug Log',
+			'description' => 'Enable logging of debug messages for ciscotools',
+			'method' => 'checkbox',
+			'default' => 'off'
+		)
 	);
 }
 
@@ -419,7 +425,10 @@ function ciscotools_draw_navigation_text ($nav) {
 }
 
 function ciscotools_log( $text ){
-    cacti_log( $text, false, "ciscotools" );
+    $dolog = read_config_option('ciscotools_log_debug');
+    if( $dolog ){
+		cacti_log( $text, false, 'CISCOTOOLS' );
+	}
 }
 
 ?>

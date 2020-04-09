@@ -21,33 +21,54 @@
  | http://www.cacti.net/                                                   |
  +-------------------------------------------------------------------------+
 */
+include($config['base_path'] . '/plugins/ciscotools/ssh2.php');
 
 /* SNMP commande need to  backup */
-$snmpciscocopyTable         = "1.3.6.1.4.1.9.9.96.1.1.1"; // Cisco Copy Table SNMP base ccCopyTable
-$snmpsetcopyentry           = $snmpciscocopyTable.".1"; // copy config request CcCopyEntry
-$snmpsetcopyindex           = $snmpsetcopyentry.".1"; // random number for copy entry ccCopyIndex
-$snmpsetcopysrcfiletype     = $snmpsetcopyentry.".3"; // Source tpe file: runningConfig', 'startupConfig' or 'iosFile' ccCopySourceFileType
-$snmpsetcopydsctfiletype    = $snmpsetcopyentry.".4"; // Dest file type ccCopyDestFileType
-$snmpsetcopysrvaddr         = $snmpsetcopyentry.".5"; // ip of the server address ccCopyServerAddress
-$snmpsetcopyfilename        = $snmpsetcopyentry.".6"; // If necessary the file name ccCopyFileName
-$snmpsetcopyusername        = $snmpsetcopyentry.".7"; // for proto 'rcp', 'scp', 'ftp', or 'sftp' ccCopyUserName
-$snmpsetcopypassword        = $snmpsetcopyentry.".8"; // ccCopyUserPassword
+$snmpciscocopyTable         = '1.3.6.1.4.1.9.9.96.1.1.1'; // Cisco Copy Table SNMP base ccCopyTable
+$snmpsetcopyentry           = $snmpciscocopyTable.'.1'; // copy config request CcCopyEntry
+$snmpsetcopyindex           = $snmpsetcopyentry.'.1'; // random number for copy entry ccCopyIndex
+$snmpsetcopysrcfiletype     = $snmpsetcopyentry.'.3'; // Source tpe file: runningConfig', 'startupConfig' or 'iosFile' ccCopySourceFileType
+$snmpsetcopydsctfiletype    = $snmpsetcopyentry.'.4'; // Dest file type ccCopyDestFileType
+$snmpsetcopysrvaddr         = $snmpsetcopyentry.'.5'; // ip of the server address ccCopyServerAddress
+$snmpsetcopyfilename        = $snmpsetcopyentry.'.6'; // If necessary the file name ccCopyFileName
+$snmpsetcopyusername        = $snmpsetcopyentry.'.7'; // for proto 'rcp', 'scp', 'ftp', or 'sftp' ccCopyUserName
+$snmpsetcopypassword        = $snmpsetcopyentry.'.8'; // ccCopyUserPassword
 
-$snmpgetcopystate           = $snmpsetcopyentry.".10"; // state of this config-copy request ccCopyState
-$snmpgetcopyfail            = $snmpsetcopyentry.".13"; // ccCopyFailCause
-$snmpgetcopystatus          = $snmpsetcopyentry.".14"; // ccCopyEntryRowStatus
+$snmpgetcopystate           = $snmpsetcopyentry.'.10'; // state of this config-copy request ccCopyState
+$snmpgetcopyfail            = $snmpsetcopyentry.'.13'; // ccCopyFailCause
+$snmpgetcopystatus          = $snmpsetcopyentry.'.14'; // ccCopyEntryRowStatus
 
 /* function called to do the backup of the device
 At the call we receive just the ID of the device.*/
-function ciscotools_backup($device=1) {
-/* retreive information from Cacti DB, name, and IP of the device */
-	$dbquery = db_fetch_row_prepared("SELECT description, hostname FROM host WHERE id=?", array($device));
-ciscotools_log("ciscotools_backup value: ".$dbquery['description']);
+function ciscotools_backup($deviceid=1) {
+    $dbquery = db_fetch_row_prepared("SELECT description, hostname, login, password FROM host WHERE id=?", array($deviceid));
 
-
+    /* if $device is 1 that mean the function is called from the tab Cisco Tools, instead of the Action backup */
+    $connection = open_ssh($dbquery['hostname'], $dbquery['login'], $dbquery['password']);
+    if($connection === false) {
+        return;
+    }
+    
+//    $data = ssh_read_stream($connection, 'term length 0' );
+    ciscotools_log("Test 1 ".$data);
+    $data = ssh_read_stream($connection, 'sh run' ); // show the current config
+    ciscotools_log("Test 2".$data);
+    // retrieve previous version, if exist, and add 1 to it.
+    $querycell = db_fetch_cell("SELECT version FROM plugin_ciscotools_backup WHERE id=".$deviceid.' ORDER BY version DESC LIMIT 1');
+    ciscotools_log('querycell: ' .$querycell);
+    $version = $querycell + 1; // just add one the the last receive.
+    
+    $ret = db_execute("INSERT INTO plugin_ciscotools_backup(host_id,version,diff,datechange) VALUES('".
+    $deviceid. "', '".
+    $version. "', '".
+    $data. "', '".
+    date("d-m-Y")."')");
+    
+    cacti_log('config backup : '.$ret, false, 'CISCOTOOLS');
 }
 
-function ciscotools_diff($device=1) {
+function ciscotools_diff($deviceid=1) {
 }
+
 
 ?>
