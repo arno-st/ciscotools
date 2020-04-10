@@ -38,7 +38,7 @@ switch(get_request_var('action')) {
 	case 'backup':
 		general_header();
 		ciscotools_tabs();
-		ciscotools_backup();
+		ciscotools_displaybackup();
 		bottom_footer();
 
 		break;

@@ -30,6 +30,7 @@ function plugin_ciscotools_install () {
 	api_plugin_register_hook('ciscotools', 'config_settings', 'ciscotools_config_settings', 'setup.php');
 	api_plugin_register_hook('ciscotools', 'config_form', 'ciscotools_config_form', 'setup.php'); // host form
 	api_plugin_register_hook('ciscotools', 'api_device_new', 'ciscotools_api_device_new', 'setup.php'); // device allready exist, just save value from the form
+	api_plugin_register_hook('ciscotools', 'poller_bottom', 'ciscotools_poller_bottom', 'setup.php'); // check the backup on all valid device, and do backup if necessary and rentetioin validation
 
 // Device action
     api_plugin_register_hook('ciscotools', 'device_action_array', 'ciscotools_device_action_array', 'setup.php');
@@ -131,17 +132,27 @@ function ciscotools_check_dependencies() {
 }
 
 function ciscotools_config_arrays () {
-	global $ciscotools_console_type;
+	global $ciscotools_console_type,$ciscotools_backup_frequencies;
 
 	$ciscotools_console_type = array(
 		"0" => "Disabled",
 		"1" => "SSH",
 		"2" => "Telnet"
 		);
+
+	$ciscotools_backup_frequencies = array(
+		"0" => "Disabled",
+		"3600" => "Every hours",
+		"86400" => "Every Day",
+		"604800" => "Every Week",
+		"1209600" => "Every 2 Weeks",
+		"2419200" => "Every 4 Weeks"
+		);
+
 }
 
 function ciscotools_config_form () {
-	global $fields_host_edit, $ciscotools_console_type;
+	global $fields_host_edit, $ciscotools_console_type, $ciscotools_backup_frequencies;
 	
 	$fields_host_edit2 = $fields_host_edit;
 	$fields_host_edit3 = array();
@@ -204,7 +215,7 @@ function ciscotools_config_form () {
 }
 
 function ciscotools_config_settings () {
-	global $tabs, $settings, $ciscotools_console_type;
+	global $tabs, $settings, $ciscotools_console_type, $ciscotools_backup_frequencies;;
 
 	if (isset($_SERVER['PHP_SELF']) && basename($_SERVER['PHP_SELF']) != 'settings.php')
 		return;
@@ -260,11 +271,18 @@ function ciscotools_config_settings () {
 			'method' => 'checkbox',
 			'default' => 'off'
 			),
-		'ciscotools_retention' => array(
+		'ciscotools_server_ip' => array(
 			'friendly_name' => 'IP address TFTP',
 			'description' => 'IP address of the TFTP server (IPv4 or IPv6)',
 			'method' => 'textbox',
 			'default' => '0.0.0.0'
+		),
+		'ciscotools_check_backup' => array(
+			'friendly_name' => 'Backup periode',
+			'description' => "When did we check if we need to backup.",
+			'method' => "drop_array",
+			'default' => '0',
+			'array' => $ciscotools_backup_frequencies,
 		),
 		'ciscotools_log_debug' => array(
 			'friendly_name' => 'Debug Log',
@@ -352,17 +370,14 @@ function ciscotools_device_action_execute($action) {
 	if ($selected_items != false) {
 		for ($i = 0; ($i < count($selected_items)); $i++) {
 			if ($action == 'ciscotools_upgrade') {
-				$dbquery = db_fetch_assoc("SELECT * FROM host WHERE id=".$selected_items[$i]);
-ciscotools_log("ciscotools_upgrade value: ".$selected_items[$i]." - ".print_r($dbquery[0])." - ".$dbquery[0]['description']."\n");
-				ciscotools_download_OS( $dbquery );
+ciscotools_log("ciscotools_upgrade value: ".$selected_items[$i]);
+				ciscotools_download_OS($selected_items[$i]);
 			} else if($action == 'ciscotools_backup') {
-				$dbquery = db_fetch_cell("SELECT id FROM host WHERE id=".$selected_items[$i]);
-				ciscotools_backup( $dbquery);
+				ciscotools_backup($selected_items[$i]);
 			}
 		}
 	}
-
-        return $action;
+	return $action;
 }
 
 function ciscotools_device_action_prepare($save) {
@@ -385,10 +400,40 @@ function ciscotools_device_action_prepare($save) {
 				<p>" . __('Click \'Continue\' to %s on these Device(s)', $action_description) . "</p>
 				<p><div class='itemlist'><ul>" . $save['host_list'] . "</ul></div></p>
 			</td>
-		</tr>";
-        
+		</tr>";  
 }
 
+function ciscotools_poller_bottom () {
+	global $config;
+
+	include_once($config['library_path'] . '/poller.php');
+	include_once($config["library_path"] . "/database.php");
+
+	if (read_config_option('ciscotools_check_backup') == "0")
+		return;
+
+	$lp = read_config_option('ciscotools_last_poll');
+
+	/* Check for the polling interval, only valid with the Multipoller patch */
+	$poller_interval = read_config_option('ciscotools_check_backup');
+
+	if ((time() - $lp) < $poller_interval){
+		return;
+	}
+
+	ciscotools_checkbackup();
+
+/*
+	// If its not set, just assume its in the path
+	if (trim($command_string) == '')
+		$command_string = 'php';
+	$extra_args = ' -q ' . $config['base_path'] . '/plugins/ciscotools/backup.php';
+
+	exec_background($command_string, $extra_args);
+*/	
+	$sql = "INSERT INTO settings VALUES ('ciscotools_last_poll','" . time() . "') ON DUPLICATE KEY UPDATE value='".time()."'";
+	$result = db_execute($sql);
+}
 
 function ciscotools_show_tab () {
 	global $config;
@@ -400,7 +445,6 @@ function ciscotools_show_tab () {
 		}
 		print '<a href="' . $config['url_path'] . 'plugins/ciscotools/ciscotools_tab.php"><img src="' . $config['url_path'] . 'plugins/ciscotools/images/ciscotools' . ($cp ? '_down': '') . '.gif" alt="Cisco Tools" align="absmiddle" border="0"></a>';
 	}
-	
 }
 
 function ciscotools_draw_navigation_text ($nav) {

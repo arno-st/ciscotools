@@ -23,27 +23,14 @@
 */
 
 function open_ssh( $hostname, $username, $password ) {
-/* ne semble pas necessaire
-    $methods = array(
-    'kex' => 'diffie-hellman-group1-sha1',
-    'client_to_server' => array(
-    'crypt'			=> 'aes256-cbc,aes192-cbc,aes128-cbc,aes128-ctr,aes192-ctr,aes256-ctr',
-    'comp'			 => 'none'),
-    'server_to_client' => array(
-    'crypt'			=> 'aes256-cbc,aes192-cbc,aes128-cbc,aes128-ctr,aes192-ctr,aes256-ctr',
-    'comp'			 => 'none'));
-
-    $connection = ssh2_connect($hostname, 22, $methods);
-*/
-
-    $connection = ssh2_connect($hostname);
+    $connection = ssh2_connect($hostname, 22);
     if($connection === false ) {
         cacti_log( "can't open SSH session to ".$hostname."error: ".$connection, false, 'CISCOTOOLS');
         return false;
     }
 
     if( !ssh2_auth_password($connection, $username, $password) ) {
-         cacti_log( "can't login to host ".$hostname." via SSH session, log: ".$username, false, 'CISCOTOOLS');
+        cacti_log( "can't login to host ".$hostname." via SSH session, log: ".$username, false, 'CISCOTOOLS');
         return false;
    }
 
@@ -54,11 +41,13 @@ function close_ssh($connection) {
     ssh2_disconnect ($connection);
 }
 
-function ssh_read_stream($connection, $cmd) {
-    $execSSH = ssh2_exec($connection, $cmd);
+function ssh_read_stream($connectionStream, $cmd) {
+
+    $execSSH = ssh2_exec($connectionStream, $cmd);
     stream_set_blocking($execSSH, true);
     $stream_out = ssh2_fetch_stream($execSSH, SSH2_STREAM_STDIO);
     $output = stream_get_contents($execSSH);
+    fclose($execSSH);
     if($output) {
         return $output;
     }
@@ -67,14 +56,4 @@ function ssh_read_stream($connection, $cmd) {
         return false;
     }
 }
-
-/* OLD FUNCTION
-function ssh_read_stream( $connection, $cmd ) {
-    $stream = ssh2_shell($connection);
-    fwrite( $stream, $cmd);
-    sleep(1);
-    $stream = ssh2_exec($connection, $cmd);
-    stream_set_blocking( $stream, true );
-*/
-
 ?>
