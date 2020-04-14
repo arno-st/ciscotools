@@ -20,21 +20,37 @@
  +-------------------------------------------------------------------------+
  | http://www.cacti.net/                                                   |
  +-------------------------------------------------------------------------+
+
+ +-------------------------+
+ |         SUMMARY         |
+ +-------------------------+
+ | 1. MAIN FUNCTION        |
+ |    1.1 OID              |
+ |    1.2 GLOBAL VARIABLE  |
+ |    1.3 CHECK QUEUE      |
+ |    1.4 SSH              |
+ |    1.5 FILE UPLOAD      |
+ |                         |
+ | 2. OTHER FUNCTIONS      |
+ |    2.1 QUEUE CHECKING   |
+ |    2.2 SIZE CHECKING    |
+ |    2.3 SNMPSET UPGRADE  |
+ |    2.4 SNMPWALK UPGRADE |
+ +-------------------------+
 */
 
-
-/*
-Mettre en place une table pour version et contrôle des versions
-OU
-Initialisation de variables en récupérant le modèle + version
-*/
+//
+// +------------------+
+// | 1. MAIN FUNCTION |
+// +------------------+
+//
 include_once($config['base_path'] . '/plugins/ciscotools/ssh2.php');
-
-/****************
-2. MAIN FUNCTION
-****************/
 function ciscotools_download_OS( $deviceUpgrade ) {
-    // OID
+
+    //
+    // 1.1 OID
+    // List of OID used
+    //
     $snmpFlashCopy  = "1.3.6.1.4.1.9.9.10.1.2.1.1"; // ciscoFlashCopyEntry
     $snmpStatus     = $snmpFlashCopy . ".8";        // ciscoFlashCopyStatus
     $snmpCmd        = $snmpFlashCopy . ".2";        // ciscoFlashCopyCommand
@@ -44,24 +60,33 @@ function ciscotools_download_OS( $deviceUpgrade ) {
     $snmpFileDest   = $snmpFlashCopy . ".6";        // ciscoFlashCopyDestinationName
     $snmpEntryStatus= $snmpFlashCopy . ".11";       // ciscoFlashCopyEntryStatus
 
+    //
+    // 1.2 GLOBAL VARIABLE
     // Initialize variable to check device
+    //
     global $upgrade_check;
     $upgrade_check = 0;
 
+    //
+    // 1.3 CHECK QUEUE
     // Call function to check device
-    ciscotools_check_device_upgrade($deviceUpgrade);
+    //
+    checkQueue($deviceUpgrade);
 
     // If check is alright, continue
     if ($upgrade_check === 0) {
         ciscotools_log("Upgrade : check is alright and continue");
         
-        // SSH
+        //
+        // 1.4 SSH
+        // Establishing SSH connection to get free space number
+        //
         $dbquery = db_fetch_row_prepared("SELECT hostname, login, password FROM host WHERE id=" . $deviceUpgrade);
         $hostname = $dbquery['hostname'];
         $username = $dbquery['login'];
         $password = $dbquery['password'];
         if (($username != "") && ($password != "")) {
-            // TEMPORARY
+            // TEMPORARY - TO DELETE
             $fileSize = 1212416;
 
             // Get total & free size of flash:
@@ -70,25 +95,12 @@ function ciscotools_download_OS( $deviceUpgrade ) {
             ciscotools_log($totalSize);
             $test = cmdSSH($hostname, $username, $password, "show run | include snmp");
             ciscotools_log($test);
-            /*
-            $cmds = ["show flash:", "show run | include snmp"];
-            for ($i = 0; $i < sizeof($cmds); $i++) {
-                if ($i == 0) {
-                    $totalSize = ssh_read_stream($connection, $cmds[0]);
-                    ciscotools_log($totalSize);
-                }
-                else {
-                    $output = ssh_read_stream($connection, $cmds[$i]);
-                    ciscotools_log($output);
-                }
-            }
-            */
 
             // Check if size is enough
             $checkSize = checkSize($totalSize, $fileSize);
             if($checkSize == true) {
                 // FILE INFOS
-                //TEMPORARY
+                //TEMPORARY - TO DELETE
                 $fileName = "test.txt";
                 $initialFileMD5 = "cfae8b8de93317f96a7c069b6ed1efe8";
                 $tftpAddress = "10.85.116.209";
@@ -97,17 +109,15 @@ function ciscotools_download_OS( $deviceUpgrade ) {
                 $snmpCommunity = "soivlsn";
                 $snmpSession = ".209";
 
+                //
+                // 1.5 FILE UPLOAD
                 // Begin upload via SNMP
-                /*
-                INITIALIZE : snmpset -v 2c -c soivlsn 10.85.0.177 1.3.6.1.4.1.9.9.10.1.2.1.1.11.50 i 5 ok
-                DEL : snmpset -v 2c -c soivlsn 10.85.0.177 1.3.6.1.4.1.9.9.10.1.2.1.1.11.50 i 6 
-                CMD : snmpset -v 2c -c soivlsn 10.85.0.177 1.3.6.1.4.1.9.9.10.1.2.1.1.2.50 i 2
-                PROT : snmpset -v 2c -c soivlsn 10.85.0.177 1.3.6.1.4.1.9.9.10.1.2.1.1.3.50 i 1
-                IP TFTP : snmpset -v 2c -c soivlsn 10.85.0.177 1.3.6.1.4.1.9.9.10.1.2.1.1.4.50 a 10.85.116.209
-                SRC : snmpset -v 2c -c soivlsn 10.85.0.177 1.3.6.1.4.1.9.9.10.1.2.1.1.5.50 s test.txt
-                DST : snmpset -v 2c -c soivlsn 10.85.0.177 1.3.6.1.4.1.9.9.10.1.2.1.1.6.50 s test.txt
-                SRC : snmpset -v 2c -c soivlsn 10.85.0.177 1.3.6.1.4.1.9.9.10.1.2.1.1.11.50 i 1
-                */
+                //
+
+                // UPLOAD INFOS
+                $snmpVersion = "2c";                // ALWAYS >2c<
+                $snmpCommunity = "soivlsn";         // Community
+                $snmpSession = "." . rand(42, 999); // Generate random int from 42 to 999
                 
                 // Upload SNMP
                 snmpUpgSet($snmpVersion, $snmpCommunity, $hostname, $snmpEntryStatus, $snmpSession, "i", "6");     // Delete session
@@ -118,10 +128,9 @@ function ciscotools_download_OS( $deviceUpgrade ) {
                 snmpUpgSet($snmpVersion, $snmpCommunity, $hostname, $snmpFileSrc, $snmpSession, "s", $fileName);   // Source File
                 snmpUpgSet($snmpVersion, $snmpCommunity, $hostname, $snmpFileDest, $snmpSession, "s", $fileName);  // Dest File
                 snmpUpgSet($snmpVersion, $snmpCommunity, $hostname, $snmpEntryStatus, $snmpSession, "i", "1");     // Begin Upload
-                ciscotools_log(snmpUpgWalk($snmpVersion, "telvlsn", $hostname, $snmpStatus, $snmpSession));
 
                 // Regex status & check end upload
-                $statusUploadRegex = "/INTEGER: [0-9]$/";
+                $statusUploadRegex = "/INTEGER: ([0-9])$/";
                 do {
                     $uploadStatus = snmpUpgWalk($snmpVersion, "telvlsn", $hostname, $snmpStatus, $snmpSession);
                     preg_match($statusUploadRegex, $uploadStatus, $uploadStatus);
@@ -129,54 +138,57 @@ function ciscotools_download_OS( $deviceUpgrade ) {
                 ciscotools_log("Upload status: " . $uploadStatus[0]);
 
                 // Delete session
-                if($uploadStatus[0] == "INTEGER: 2") {
+                snmpUpgSet($snmpVersion, $snmpCommunity, $hostname, $snmpEntryStatus, $snmpSession, "i", "6");
 
+                if($uploadStatus[1] == "2") {
+                    // Continue? OID catches error number and does checksum
+                    ciscotools_log("Upload status: Succeed");
                 }
                 else {
-                    switch($uploadStatus[0]) {
-                        case "INTEGER: 3":
-                            ciscotools_log("UPLOAD ERROR: ");
-                            case "INTEGER: 3":
-                                ciscotools_log("UPLOAD ERROR: ");
-                        
+                    switch($uploadStatus[1]) {
+                        case "3":
+                             $errorUploadMsg = "Invalid Operation";
+                        case "4":
+                            $errorUploadMsg = "Invalid Protocol";
+                        case "5":
+                            $errorUploadMsg = "Invalid Source Name";
+                        case "6":
+                            $errorUploadMsg = "Invalid Destination Name";
+                        case "7":
+                            $errorUploadMsg = "Invalid Server Address";
+                        case "8":
+                            $errorUploadMsg = "Device Busy";
+                        case "9":
+                            $errorUploadMsg = "Device Open Error";
+                        case "10":
+                            $errorUploadMsg = "Device Error";
+                        case "11":
+                            $errorUploadMsg = "Device Not Programmable";
+                        case "12":
+                            $errorUploadMsg = "Device Full";
+                        case "13":
+                            $errorUploadMsg = "File Open Error";
+                        case "14":
+                            $errorUploadMsg = "File Transfer Error";
+                        case "15":
+                            $errorUploadMsg = "Checksum Error";
+                        case "16":
+                            $errorUploadMsg = "No Memory";
+                        case "17":
+                            $errorUploadMsg = "Unknown Failure";
+                        case "18":
+                            $errorUploadMsg = "Invalid Signature";
+                        case "19":
+                            $errorUploadMsg = "Prohibited";
+                        default:
+                            $errorUploadMsg = "Unknown Error";
                     }
+                    ciscotools_log("UPLOAD ERROR {" . $uploadStatus[1] . ": " . $errorUploadMsg . "}");
                 }
-/*
-copyInvalidOperation(3),
-                        copyInvalidProtocol(4),
-                        copyInvalidSourceName(5),
-                        copyInvalidDestName(6),
-                        copyInvalidServerAddress(7),
-                        copyDeviceBusy(8),
-                        copyDeviceOpenError(9),
-                        copyDeviceError(10),
-                        copyDeviceNotProgrammable(11),
-                        copyDeviceFull(12),
-                        copyFileOpenError(13),
-                        copyFileTransferError(14),
-                        copyFileChecksumError(15),
-                        copyNoMemory(16),
-                        copyUnknownFailure(17),
-                        copyInvalidSignature(18),
-                        copyProhibited(19)
-*/
-
-                //snmpset($hostname, "telvlsn", ".1.3.6.1.4.1.9.2.10.9.10.85.116.209", "s", "test.txt enterprises.9.2.10.9.10.85.116.209 = test.txt");
-
-                // End upload >> check final file MD5
-                /*
-                $cmdVerify = "verify /md5 flash:" . $fileName;
-                $checkIntegrity = ssh_read_stream($connection, $cmdVerify);
-                */
             }
             elseif ($checkSize == false) {
                 return false;
             }
-            
-            /*
-            // Disconnect SSH
-            close_ssh($connection);
-            */
         }
         else {
             ciscotools_log("No login - No password");
@@ -206,10 +218,13 @@ copyInvalidOperation(3),
 }
 
 /************
-3. FUNCTIONS
+2.1 OTHER FUNCTIONS
 ************/
-// Check function to know if device is already in the queue
-function ciscotools_check_device_upgrade( $deviceUpgrade ) {
+
+//
+// 2.1 QUEUE CHECKING
+//
+function checkQueue( $deviceUpgrade ) {
     // Query if device is already in queue
     echo 'console.log('. json_encode( $deviceUpgrade ) .')';
 
@@ -232,6 +247,20 @@ function ciscotools_check_device_upgrade( $deviceUpgrade ) {
     }
 }
 
+//
+// 2.
+//
+function cmdSSH($hostname, $username, $password, $cmd) {
+    $connection = open_ssh($hostname, $username, $password);
+    $output = ssh_read_stream($connection, $cmd);
+    close_ssh($connection);
+    $output = addslashes(substr($output, strpos($output,'version')+25));
+    return $output;
+}
+
+//
+// 2.2 SIZE CHECKING
+//
 function checkSize($totalSize, $fileSize) {
     // Regex Size
     $regexSize = "/\((.*) bytes free\)/";
@@ -249,24 +278,25 @@ function checkSize($totalSize, $fileSize) {
     }
 }
 
-function cmdSSH($hostname, $username, $password, $cmd) {
-    $connection = open_ssh($hostname, $username, $password);
-    $output = ssh_read_stream($connection, $cmd);
-    close_ssh($connection);
-    $output = addslashes(substr($output, strpos($output,'version')+25));
-    return $output;
-}
-
+//
+// 2.3 SNMPSET UPGRADE
+//
 function snmpUpgSet($snmpVersion, $snmpCommunity, $hostname, $oid, $snmpSession, $snmpDataType, $snmpData) {
     $snmpExec = shell_exec("snmpset -v " . $snmpVersion . " -c " . $snmpCommunity . " " . $hostname . " " . $oid . $snmpSession . " " . $snmpDataType . " " . $snmpData);
     ciscotools_log($snmpExec);
     return $snmpExec;
 }
 
+//
+// 2.4 SNMPWALK UPGRADE
+//
 function snmpUpgWalk($snmpVersion, $snmpCommunity, $hostname, $oid, $snmpSession) {
     $snmpExec = shell_exec("snmpwalk -v " . $snmpVersion . " -c " . $snmpCommunity . " " . $hostname . " " . $oid . $snmpSession);
     //ciscotools_log($snmpExec);
     return $snmpExec;
 }
 
+//
+// 2.5 Host info
+//
 ?>

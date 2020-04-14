@@ -89,7 +89,7 @@ function ciscotools_checkbackup() {
 
         if($lastchange > $savedchange ){
             ciscotools_log('Device: '.$host['description']. ' need backup '.$lastchange .' backup: '.$savedchange);
-            //ciscotools_backup($host['id'];
+            ciscotools_backup($host['id'], false);
         } else ciscotools_log('Device: '.$host['description']. ' no diff since last backup');
     }        
 }
@@ -98,41 +98,24 @@ function ciscotools_displaybackup() {
 }
 
 /* function called to do the backup of the device
-At the call we receive just the ID of the device.
-and we did a full backup
+At the call we receive the ID of the device.
+and we did a full backup, if isfull is flase then only a diff is keep
 */
-function ciscotools_backup($deviceid) {
+function ciscotools_backup($deviceid, $isfull=true) {
      // retrieve previous version, if exist, and add 1 to it.
-    $querybackupcell = db_fetch_row("SELECT version, datechange as date FROM plugin_ciscotools_backup WHERE host_id=".$deviceid." ORDER BY version DESC LIMIT 1");
-
-    $dbquery = db_fetch_row_prepared("SELECT description, hostname FROM host WHERE id=?", array($deviceid));
-    if( $dbquery === false ){
-        return; // no host to backup
-    }
-    $account = check_login_password($deviceid);
-
-    /* if $device is 1 that mean the function is called from the tab Cisco Tools, instead of the Action backup */
-    $connection = open_ssh($dbquery['hostname'], $account['login'], $account['password']);
-    if($connection === false) {
-        return;
-    }
+    $querybackuprow = db_fetch_row("SELECT version, datechange as date FROM plugin_ciscotools_backup WHERE host_id=".$deviceid." ORDER BY version DESC LIMIT 1");
     
-    $data = ssh_read_stream($connection, 'sh run' ); // show the current config
-    if($data===false){
-        close_ssh($connection);
-        return;
-    }
-    close_ssh($connection);
+    $data = ssh_open_cmd($deviceid,'sh run' ); // show the current config
     
     // remove all before version
-    $data = addslashes(substr($data, strpos($data,'version')+12)); // remove the banner and version from config    ciscotools_log("Test 2".$data);
-    $version = $querybackupcell + 1; // just add one the the last receive.
+    $data = addslashes(substr($data, strpos($data,'version')+12)); // remove the banner and version from config
+    $version = empty($querybackuprow['date'])?1:$querybackuprow['date'] + 1; // just add one the the last receive.
     
     $ret = db_execute("INSERT INTO plugin_ciscotools_backup(host_id,version,diff,datechange) VALUES('".
     $deviceid. "', '".
     $version. "', '".
     $data. "', '".
-    date("dmY")."')");
+    date("Ymd")."')");
     
     cacti_log($ret?'config backup done':'config backup error', false, 'CISCOTOOLS');
     
@@ -143,21 +126,10 @@ function ciscotools_lastchange($deviceid) {
     sh run | inc configuration change            D   M   d y
     ! Last configuration change at 12:28:03 LSN Wed Apr 8 2020 by a_soi_0518
     */
-     $dbquery = db_fetch_row_prepared("SELECT description, hostname FROM host WHERE id=?", array($deviceid));
-    if( $dbquery === false ){
-        return; // no host to backup
-    }
-    $account = check_login_password($deviceid);
-    
-    $connection = open_ssh($dbquery['hostname'], $account['login'], $account['password']);
-    if($connection === false) {
-        return;
-    }
-    $data = ssh_read_stream($connection, 'sh run | inc configuration change' ); // show the current config
-    close_ssh($connection);
+    $data = ssh_open_cmd($deviceid, 'sh run | inc configuration change' ); // show the last version save
     
     $data = substr($data, strpos($data,'LSN')+8, 11);
-    $date = date( "dmY", strtotime($data) );
+    $date = date( "Ymd", strtotime($data) );
 
     return $date;
 }
@@ -184,6 +156,23 @@ function check_login_password( $deviceid){
     }
  
     return $account;
+}
+
+function ssh_open_cmd( $deviceid, $cmd ) {
+    $dbquery = db_fetch_row_prepared("SELECT description, hostname FROM host WHERE id=?", array($deviceid));
+    if( $dbquery === false ){
+        return; // no host to backup
+    }
+    $account = check_login_password($deviceid);
+    
+    $connection = open_ssh($dbquery['hostname'], $account['login'], $account['password']);
+    if($connection === false) {
+        return;
+    }
+    $data = ssh_read_stream($connection, $cmd );
+    close_ssh($connection);
+    
+    return $data;
 }
 
 function snmp_set($hostname, $community, $oid, $version, $auth_user = '', $auth_pass = '',

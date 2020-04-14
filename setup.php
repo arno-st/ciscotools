@@ -237,14 +237,14 @@ function ciscotools_config_settings () {
 			"friendly_name" => "Default Login Name",
 			"description" => "This is default Login name for the console access.",
 			"method" => "textbox",
-			"max_length" => 45,
+			"max_length" => 20,
 			'default' => ''
 			),
 		'ciscotools_default_password' => array(
 			"friendly_name" => "Default Password Name",
 			"description" => "This is default Password for the console access.",
 			"method" => "textbox_password",
-			"max_length" => 45,
+			"max_length" => 20,
 			'default' => ''
 			),
 		'ciscotools_default_can_be_upgraded' => array(
@@ -275,6 +275,7 @@ function ciscotools_config_settings () {
 			'friendly_name' => 'IP address TFTP',
 			'description' => 'IP address of the TFTP server (IPv4 or IPv6)',
 			'method' => 'textbox',
+			'max_length' => 32,
 			'default' => '0.0.0.0'
 		),
 		'ciscotools_check_backup' => array(
@@ -392,7 +393,7 @@ function ciscotools_device_action_prepare($save) {
         if ($action == 'ciscotools_upgrade') {
 			$action_description = 'Upgrade selected device';
 		} else if ($action == 'ciscotools_backup') {
-			$action_description = 'Backup selected device';
+			$action_description = "Backup selected device, on this case it is a full backup; and all previous diff will be supressed";
 		}
 		
 		print "<tr>
