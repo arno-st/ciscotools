@@ -96,10 +96,10 @@ function ciscotools_setup_tables() {
 // Device login/password and console type
 	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'login', 'type' => 'varchar(20)', 'NULL' => true,  'default' => ''));
 	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'password', 'type' => 'varchar(20)', 'NULL' => true, 'default' => ''));
-	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'console_type', 'type' => 'varchar(2)', 'NULL' => true, 'default' => ''));
-	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'can_be_upgraded', 'type' => 'varchar(2)', 'NULL' => true, 'default' => ''));
-	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'can_be_rebooted', 'type' => 'varchar(2)', 'NULL' => true, 'default' => ''));
-	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'do_backup', 'type' => 'varchar(2)', 'NULL' => true, 'default' => ''));
+	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'console_type', 'type' => 'varchar(3)', 'NULL' => true, 'default' => ''));
+	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'can_be_upgraded', 'type' => 'varchar(3)', 'NULL' => true, 'default' => ''));
+	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'can_be_rebooted', 'type' => 'varchar(3)', 'NULL' => true, 'default' => ''));
+	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'do_backup', 'type' => 'varchar(3)', 'NULL' => true, 'default' => ''));
 
 /* table to keep diff information */
 	$data = array();
@@ -319,31 +319,31 @@ function ciscotools_api_device_new($hostrecord_array) {
 	if (isset($_POST['password'])) {
 		$hostrecord_array['password'] = form_input_validate($_POST['password'], 'password', '', true, 3);
 	} else {
-		$hostrecord_array['password'] = form_input_validate('', 'password', '', true, 3);
+		$hostrecord_array['password'] = form_input_validate('off', 'password', '', true, 3);
 	}
 	
 	if (isset($_POST['console_type'])) {
 		$hostrecord_array['console_type'] = form_input_validate($_POST['console_type'], 'console_type', '', true, 3);
 	} else {
-		$hostrecord_array['console_type'] = form_input_validate('', 'console_type', '', true, 3);
+		$hostrecord_array['console_type'] = form_input_validate('off', 'console_type', '', true, 3);
 	}
 
 	if (isset($_POST['can_be_upgraded'])) {
 		$hostrecord_array['can_be_upgraded'] = form_input_validate($_POST['can_be_upgraded'], 'can_be_upgraded', '', true, 3);
 	} else {
-		$hostrecord_array['can_be_upgraded'] = form_input_validate('', 'can_be_upgraded', '', true, 3);
+		$hostrecord_array['can_be_upgraded'] = form_input_validate('off', 'can_be_upgraded', '', true, 3);
 	}
 	
 	if (isset($_POST['can_be_rebooted'])) {
 		$hostrecord_array['can_be_rebooted'] = form_input_validate($_POST['can_be_rebooted'], 'can_be_rebooted', '', true, 3);
 	} else {
-		$hostrecord_array['can_be_rebooted'] = form_input_validate('', 'can_be_rebooted', '', true, 3);
+		$hostrecord_array['can_be_rebooted'] = form_input_validate('off', 'can_be_rebooted', '', true, 3);
 	}
 
 	if (isset($_POST['do_backup'])) {
 		$hostrecord_array['do_backup'] = form_input_validate($_POST['do_backup'], 'do_backup', '', true, 3);
 	} else {
-		$hostrecord_array['do_backup'] = form_input_validate('', 'do_backup', '', true, 3);
+		$hostrecord_array['do_backup'] = form_input_validate('off', 'do_backup', '', true, 3);
 	}
 
 	sql_save($hostrecord_array, 'host');
@@ -409,17 +409,23 @@ function ciscotools_poller_bottom () {
 	include_once($config['library_path'] . '/poller.php');
 	include_once($config["library_path"] . "/database.php");
 
-	if (read_config_option('ciscotools_check_backup') == "0")
+	$poller_interval = read_config_option('ciscotools_check_backup');
+
+	if ($poller_interval == "0") {
 		return;
+	}
 
 	$lp = read_config_option('ciscotools_last_poll');
 
-	/* Check for the polling interval, only valid with the Multipoller patch */
-	$poller_interval = read_config_option('ciscotools_check_backup');
-
 	if ((time() - $lp) < $poller_interval){
+		ciscotools_log('time: '.time().' lp: '. $lp .' poller: '. $poller_interval.' diff: '.(time() - $lp));
 		return;
 	}
+
+	$sql = "INSERT INTO settings VALUES ('ciscotools_last_poll','" . time() . "') ON DUPLICATE KEY UPDATE value='".time()."'";
+	$result = db_execute($sql);
+	ciscotools_log('Go time: '.time().' lp: '. $lp .' poller: '. $poller_interval.' diff: '.(time() - $lp));
+	ciscotools_log('sql: '.$sql.' result:'.$result);
 
 	ciscotools_checkbackup();
 
@@ -431,8 +437,6 @@ function ciscotools_poller_bottom () {
 
 	exec_background($command_string, $extra_args);
 */	
-	$sql = "INSERT INTO settings VALUES ('ciscotools_last_poll','" . time() . "') ON DUPLICATE KEY UPDATE value='".time()."'";
-	$result = db_execute($sql);
 }
 
 function ciscotools_show_tab () {
