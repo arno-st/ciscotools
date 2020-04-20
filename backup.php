@@ -89,7 +89,7 @@ function ciscotools_checkbackup() {
 
         if($lastchange > $savedchange ){
             ciscotools_log('Device: '.$host['description']. ' need backup '.$lastchange .' backup: '.$savedchange);
-            ciscotools_backup($host['id'], false);
+            ciscotools_backup($host['id']);
         } else ciscotools_log('Device: '.$host['description']. ' no diff since last backup');
     }        
 }
@@ -99,17 +99,16 @@ function ciscotools_displaybackup() {
 
 /* function called to do the backup of the device
 At the call we receive the ID of the device.
-and we did a full backup, if isfull is flase then only a diff is keep
 */
-function ciscotools_backup($deviceid, $isfull=true) {
+function ciscotools_backup($deviceid) {
      // retrieve previous version, if exist, and add 1 to it.
-    $querybackuprow = db_fetch_row("SELECT version, datechange as date FROM plugin_ciscotools_backup WHERE host_id=".$deviceid." ORDER BY version DESC LIMIT 1");
+    $querybackuprow = db_fetch_row("SELECT version, datechange FROM plugin_ciscotools_backup WHERE host_id=".$deviceid." ORDER BY version DESC LIMIT 1");
     
     $data = ssh_open_cmd($deviceid,'sh run' ); // show the current config
     
     // remove all before version
     $data = addslashes(substr($data, strpos($data,'version')+12)); // remove the banner and version from config
-    $version = empty($querybackuprow['date'])?1:$querybackuprow['date'] + 1; // just add one the the last receive.
+    $version = (empty($querybackuprow['version']))?1:$querybackuprow['version'] + 1; // just add one the the last receive.
     
     $ret = db_execute("INSERT INTO plugin_ciscotools_backup(host_id,version,diff,datechange) VALUES('".
     $deviceid. "', '".
@@ -158,6 +157,9 @@ function check_login_password( $deviceid){
     return $account;
 }
 
+/* do the connection and cmd execution, including check of the login password
+    and if necessary take the default settings.
+*/
 function ssh_open_cmd( $deviceid, $cmd ) {
     $dbquery = db_fetch_row_prepared("SELECT description, hostname FROM host WHERE id=?", array($deviceid));
     if( $dbquery === false ){
@@ -169,6 +171,7 @@ function ssh_open_cmd( $deviceid, $cmd ) {
     if($connection === false) {
         return;
     }
+    
     $data = ssh_read_stream($connection, $cmd );
     close_ssh($connection);
     

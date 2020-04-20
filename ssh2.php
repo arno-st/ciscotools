@@ -41,13 +41,20 @@ function close_ssh($connection) {
     ssh2_disconnect ($connection);
 }
 
-function ssh_read_stream($connectionStream, $cmd) {
+function ssh_read_stream($connection, $cmd) {
 
-    $execSSH = ssh2_exec($connectionStream, $cmd);
-    stream_set_blocking($execSSH, true);
-    $stream_out = ssh2_fetch_stream($execSSH, SSH2_STREAM_STDIO);
-    $output = stream_get_contents($execSSH);
-    fclose($execSSH);
+    $stream = ssh2_exec($connection, $cmd, 'ansi');
+    stream_set_blocking($stream, true);
+    /*
+    $stream_out = ssh2_fetch_stream($stream, SSH2_STREAM_STDIO);
+    $output = stream_get_contents($stream);
+*/
+    $output = '';
+    while($stream_out = fgets($stream)){
+        $output .= $stream_out;
+    }
+    
+    fclose($stream);
     if($output) {
         return $output;
     }

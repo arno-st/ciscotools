@@ -117,6 +117,59 @@ function ciscotools_setup_tables() {
 	$data['comment'] = 'Plugin ciscotoole - Table for diff in config change';
 	api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_backup', $data);
 
+/* table to keep a queue of upgrade */
+	unset($data);
+	$data = array();
+	$data['columns'][] = array('name' => 'id', 'type' => 'mediumint(8)', 'auto_increment'=>'');
+	$data['columns'][] = array('name' => 'host_id', 'type' => 'mediumint(8)', 'NULL' => false, 'default' => '0');
+	$data['primary'] = 'id';
+	$data['keys'][] = array('name' => 'id', 'columns' => 'id');
+	$data['keys'][] = array('name' => 'host_id', 'columns' => 'host_id');
+	$data['type'] = 'InnoDB';
+	api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_queueupgrade', $data);
+
+/* table to keep diff info for modele/version */
+	unset($data);
+	$data = array();
+	$data['columns'][] = array('name' => 'id', 'type' => 'mediumint(8)', 'auto_increment'=>'');
+	$data['columns'][] = array('name' => 'snmp_SysObjectId', 'type' => 'varchar(128)', 'NULL' => false);
+	$data['columns'][] = array('name' => 'oid_modele', 'type' => 'varchar(32)', 'NULL' => false, 'default' => '1.3.6.1.2.1.47.1.1.1.1.13');
+	$data['columns'][] = array('name' => 'modele', 'type' => 'varchar(128)', 'NULL' => true);
+	$data['columns'][] = array('name' => 'image', 'type' => 'varchar(255)', 'NULL' => false);
+	$data['primary'] = 'id';
+	$data['keys'][] = array('name' => 'modele', 'columns' => 'modele');
+	$data['type'] = 'InnoDB';
+	api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_modele', $data);
+
+/* insert values in plugin_ciscotools_modele */
+	db_execute("INSERT INTO `plugin_ciscotools_modele` "
+		."(`id`, `snmp_SysObjectId`, `oid_modele`, `modele`, `image`, `sshCmds_version`) VALUES "
+		."(NULL, 'iso.3.6.1.4.1.9.1.2560', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'IR807G-LTE-GA-K9', 'ir800l-universalk9-mz.SPA.159-3.M.bin', 'dir|show version'),"
+		."(NULL, 'iso.3.6.1.4.1.9.1.1497', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'C819G-4G-G-K9', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'dir|show version'),"
+		."(NULL, 'iso.3.6.1.4.1.9.1.1378', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'C819G-U-K9', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'dir|show version'),"
+		."(NULL, 'iso.3.6.1.4.1.9.1.1384', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'C819HG-U', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'dir|show version'),"
+		."(NULL, 'iso.3.6.1.4.1.9.1.2059', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'cisco819G-4G', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'dir|show version'),"
+		."(NULL, 'iso.3.6.1.4.1.9.1.837', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'CISCO881', 'c880data-universalk9-mz.155-3.M6.bin', 'dir|show version'),"
+		."(NULL, 'iso.3.6.1.4.1.9.1.857', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'CISCO891-K9', 'c890-universalk9-mz.155-3.M8.bin', 'dir|show version'),"
+		."(NULL, 'iso.3.6.1.4.1.9.1.1858', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'cisco891F', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'dir|show version'),"
+		."(NULL, 'iso.3.6.1.4.1.9.5.18', '1.3.6.1.2.1.47.1.1.1.1.13', NULL, 'c1900-universalk9-mz.SPA.154-3.M7.bin', 'dir|show version'),"
+		."(NULL, 'iso.3.6.1.4.1.9.1.2661', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'IR1101-K9', 'ir1101-universalk9.16.11.01.SPA.bin', 'dir|show version'),"
+		."(NULL, 'iso.3.6.1.4.1.9.1.1041', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'CISCO3945-CHASSIS', 'c3900-universalk9-mz.SPA.155-3.M4.bin', 'dir|show version'),"
+		."(NULL, 'iso.3.6.1.4.1.9.1.1470', '1.3.6.1.2.1.47.1.1.1.1.13.1001', 'IE-2000-4TC-G-B', 'ie2000-universalk9-tar.152-4.EA7.tar', 'dir|show version'),"
+		."(NULL, 'iso.3.6.1.4.1.9.1.1471', '1.3.6.1.2.1.47.1.1.1.1.13.1001', 'IE-2000-4T-G-B', 'ie2000-universalk9-tar.152-4.EA7.tar', 'dir|show version'),"
+		."(NULL, 'iso.3.6.1.4.1.9.1.1473', '1.3.6.1.2.1.47.1.1.1.1.13.1001', 'IE-2000-8TC-G-B', 'ie2000-universalk9-tar.152-4.EA7.tar', 'dir|show version'),"
+		."(NULL, 'iso.3.6.1.4.1.9.1.1730', '1.3.6.1.2.1.47.1.1.1.1.13.1001', 'IE-2000-16PTC-G-E', 'ie2000-universalk9-tar.152-4.EA7.tar', 'dir|show version'),"
+		."(NULL, 'iso.3.6.1.4.1.9.1.95', '1.3.6.1.2.1.47.1.1.1.1.13.1001', 'IE-3000-8TC', 'ies-lanbasek9-tar.152-4.EA8.tar', 'dir|show version'),"
+		."(NULL, 'iso.3.6.1.4.1.9.1.1208', '1.3.6.1.2.1.47.1.1.1.1.13.1001', 'WS-C2960X-24PS-L', 'c2960x-universalk9-mz.152-6.E2.bin', 'dir|show version'),"
+		."(NULL, 'iso.3.6.1.4.1.9.1.1208', '1.3.6.1.2.1.47.1.1.1.1.13.1001', 'WS-C2960S-24PS-L', 'c2960s-universalk9-mz.152-2.E9.bin', 'dir|show version'),"
+		."(NULL, 'iso.3.6.1.4.1.9.1.1317', '1.3.6.1.2.1.47.1.1.1.1.13.1001', 'WS-C3560CG-8PC-S', 'c3560c405ex-universalk9-mz.152-2.E6.bin', 'dir|show version'),"
+		."(NULL, 'iso.3.6.1.4.1.9.1.2134', '1.3.6.1.2.1.47.1.1.1.1.13.1001', 'WS-C3560CX-12PC-S', 'c3560cx-universalk9-mz.152-6.E2.bin', 'dir|show version'),"
+		."(NULL, 'iso.3.6.1.4.1.9.1.1745', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'WS-C3850-24XS-S', 'cat3k_caa-universalk9.16.06.06.SPA.bin', 'dir|show version'),"
+		."(NULL, 'iso.3.6.1.4.1.9.1.2694', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'C9200L-24P-4G-E', 'cat9k_lite_iosxe.16.09.05.SPA.bin', 'dir|more flash:.installer/install_add_oper.log'),"
+		."(NULL, 'iso.3.6.1.4.1.9.1.2593', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'C9500-16X', 'cat9k_iosxe.16.09.05.SPA.bin', 'dir|more flash:.installer/install_add_oper.log'),"
+		."(NULL, 'iso.3.6.1.4.1.9.1.1732', '1.3.6.1.2.1.47.1.1.1.1.13.1000', 'WS-C4500X-32', 'cat4500e-universalk9.SPA.03.06.05.E.152-2.E5.bin', 'dir|show version') "
+		."ON DUPLICATE KEY UPDATE id=id;");
+
 }
 
 function plugin_ciscotools_version () {
@@ -271,12 +324,12 @@ function ciscotools_config_settings () {
 			'method' => 'checkbox',
 			'default' => 'off'
 			),
-		'ciscotools_server_ip' => array(
-			'friendly_name' => 'IP address TFTP',
-			'description' => 'IP address of the TFTP server (IPv4 or IPv6)',
+		'ciscotools_default_tftp' => array(
+			'friendly_name' => 'TFTP server address',
+			'description' => 'IP address of the TFTP server',
 			'method' => 'textbox',
-			'max_length' => 32,
-			'default' => '0.0.0.0'
+			'max_length' => 45, //Allow IPv4 & v6
+			'default' => '127.0.0.1'
 		),
 		'ciscotools_check_backup' => array(
 			'friendly_name' => 'Backup periode',
@@ -393,7 +446,7 @@ function ciscotools_device_action_prepare($save) {
         if ($action == 'ciscotools_upgrade') {
 			$action_description = 'Upgrade selected device';
 		} else if ($action == 'ciscotools_backup') {
-			$action_description = "Backup selected device, on this case it is a full backup; and all previous diff will be supressed";
+			$action_description = "Backup selected device.";
 		}
 		
 		print "<tr>
@@ -418,15 +471,14 @@ function ciscotools_poller_bottom () {
 
 	$lp = read_config_option('ciscotools_last_poll');
 
-	if ((time() - $lp) < $poller_interval){
+	if ((time() - $lp) < $poller_interval || (time() - $lp) > $poller_interval+60){
 		ciscotools_log('time: '.time().' lp: '. $lp .' poller: '. $poller_interval.' diff: '.(time() - $lp));
 		return;
 	}
 
-	$sql = "INSERT INTO settings VALUES ('ciscotools_last_poll','" . time() . "') ON DUPLICATE KEY UPDATE value='".time()."'";
-	$result = db_execute($sql);
+	set_config_option('ciscotools_last_poll', time());
+	
 	ciscotools_log('Go time: '.time().' lp: '. $lp .' poller: '. $poller_interval.' diff: '.(time() - $lp));
-	ciscotools_log('sql: '.$sql.' result:'.$result);
 
 	ciscotools_checkbackup();
 
