@@ -34,33 +34,41 @@ function open_ssh( $hostname, $username, $password ) {
         return false;
    }
 
-    return $connection;
+    $stream = ssh2_shell($connection, 'vt100', null, 80, 24, SSH2_TERM_UNIT_CHARS );
+	stream_set_timeout($stream, 10);
+	stream_set_blocking($stream, true);
+
+    return $stream;
+
 }
 
 function close_ssh($connection) {
     ssh2_disconnect ($connection);
 }
 
-function ssh_read_stream($connection, $cmd) {
-
-    $stream = ssh2_exec($connection, $cmd, 'ansi');
-    stream_set_blocking($stream, true);
-    /*
-    $stream_out = ssh2_fetch_stream($stream, SSH2_STREAM_STDIO);
-    $output = stream_get_contents($stream);
-*/
-    $output = '';
-    while($stream_out = fgets($stream)){
-        $output .= $stream_out;
-    }
-    
-    fclose($stream);
-    if($output) {
+function ssh_read_stream($stream) {
+	$output = '';
+	
+    do {
+		$stream_out = fread ($stream, 1);
+        // ciscotools_log('stream read: >'.$stream_out.'<('.strlen($stream_out).')'.' hex:'.bin2hex($stream_out));
+		$output .= $stream_out;
+     } while ( !feof($stream) && $stream_out !== false && $stream_out != '#');
+   
+    if(strlen($output)!=0) {
         return $output;
     }
     else {
-        ciscotools_log("cmdSSH - Error - No output");
+        ciscotools_log('cmdSSH - Error - No output');
         return false;
     }
+}
+
+function ssh_write_stream( $stream, $cmd){
+    do {
+	$write = fwrite( $stream, $cmd.PHP_EOL );
+    echo 'ecrit:'.$write.PHP_EOL;
+	} while( $write < strlen($cmd) );
+
 }
 ?>

@@ -24,34 +24,23 @@
 chdir('../../');
 include_once('./include/auth.php');
 
-include_once($config['base_path'] . '/plugins/ciscotools/backup.php');
-
 set_default_action('backup');
 
+
 switch(get_request_var('action')) {
-	case 'ajax_hosts':
-
-		break;
-	case 'ajax_hosts_noany':
-
-		break;
-	case 'backup':
-		general_header();
-		ciscotools_tabs();
-		ciscotools_displaybackup();
-		bottom_footer();
-
-		break;
 	case 'diff':
 		general_header();
 		ciscotools_tabs();
-		ciscotools_diff();
+		$deviceid = get_request_var('deviceid');
+		$deviceid?ciscotools_diff():ciscotools_displaybackup();
 		bottom_footer();
+		break;
 
-		exit;
+	case 'backup': // same for both action
 	default:
 		general_header();
 		ciscotools_tabs();
+		ciscotools_displaybackup();
 		bottom_footer();
 		break;
 }
