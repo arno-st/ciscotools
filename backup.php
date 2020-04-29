@@ -77,7 +77,7 @@ function ciscotools_checkbackup() {
         ciscotools_log('No device to backup');
         return; // no host to backup
     }
-    ciscotools_log("need to backup :". count($dbquery)." hosts" );
+    ciscotools_log("need to check backup :". count($dbquery)." hosts" );
     
     // do backup for all device discovered
     foreach( $dbquery as $host ){
@@ -91,7 +91,7 @@ function ciscotools_checkbackup() {
         // check if it's time to backup, depending of the last change recorded
         $savedchange = db_fetch_cell("SELECT datechange FROM plugin_ciscotools_backup WHERE host_id=".$host['id']." ORDER BY version DESC LIMIT 1");
 
-        if($lastchange > $savedchange ){
+        if($lastchange > $savedchange || empty($savedchange) ){
             ciscotools_log('Device: '.$host['description']. ' need backup '.$lastchange .' backup: '.$savedchange);
             ciscotools_backup($host['id']);
         } else ciscotools_log('Device: '.$host['description']. ' no diff since last backup');
@@ -334,18 +334,9 @@ At the call we receive the ID of the device.
 function ciscotools_backup($deviceid) {
      // retrieve previous version, if exist, and add 1 to it.
     $querybackuprow = db_fetch_row("SELECT version, datechange FROM plugin_ciscotools_backup WHERE host_id=".$deviceid." ORDER BY version DESC LIMIT 1");
-    $dbquery = db_fetch_row_prepared("SELECT description, hostname FROM host WHERE id=?", array($deviceid));
-    if( $dbquery === false ){
-        return false; // no host to backup
-    }
-    $account = check_login_password($deviceid);
 
-	$stream = open_ssh($dbquery['hostname'], $account['login'], $account['password']);
-	if($stream === false) exit;
-
-	$data = ssh_read_stream($stream );
-	if( $data === false ){
-		ciscotools_log( 'Erreur can\'t read login prompt');
+	$stream = create_ssh($deviceid);
+	if( $stream === false ) {
 		return;
 	}
 
@@ -365,8 +356,8 @@ function ciscotools_backup($deviceid) {
 	
     // clean up config
     $data = substr($data, strpos($data,'version')); // remove the banner and version from config
-	$data = substr($data, strpos($data,"\n")+1); // remove the line after config before the first 0d0a
-	$data = addslashes(substr($data, 0, strrpos($data, "\n",0) )); // remove the end of the config
+	$data = substr($data, strpos($data,"\n")+1); // remove the line after config before the first 0d0a, +1 is for the 0a
+	$data = addslashes(substr($data, 0, strrpos($data, "\n",0)-2 )); // remove the end of the config, -2 is for 0d0a
 	
     $version = (empty($querybackuprow['version']))?1:$querybackuprow['version'] + 1; // just add one the the last receive.
     
@@ -389,18 +380,13 @@ function ciscotools_lastchange($deviceid) {
     if( $dbquery === false ){
         return false; // no host to backup
     }
-    $account = check_login_password($deviceid);
 
-	$stream = open_ssh($dbquery['hostname'], $account['login'], $account['password']);
-	if($stream === false) exit;
-
-	$data = ssh_read_stream($stream );
-	if( $data === false ){
-		ciscotools_log( 'Erreur can\'t read login prompt');
+	$stream = create_ssh($deviceid);
+	if($stream === false){
 		return false;
 	}
-
-	if(ssh_write_stream($stream, 'sh run | inc configuration change' ) === false) return;
+	
+	if(ssh_write_stream($stream, 'sh run | inc change|!Time' ) === false) return;
 	$data = ssh_read_stream($stream);
 	if( $data === false ){
 		ciscotools_log( 'Erreur can\'t read version');
@@ -408,11 +394,9 @@ function ciscotools_lastchange($deviceid) {
 	}
 	
 	if($data !== false ) {
-		$data = substr($data, strpos($data, "\n")); // clean up start of the string
-		$data = substr($data, 0, strrpos($data, "\n",0)); // clean up end of the string
-		$data_array = explode(' ', $data);
-		$data = $data_array[8].'-'.$data_array[9].'-'.$data_array[10];
-		$date = date( "Ymd", strtotime($data) ); // Apr272020
+		$data = substr($data, strpos($data, "\n")+1); // clean up start of the string +1 for 0A
+		$data = substr($data, 0, strpos($data, "\n")-1); // clean up end of the string, -2 for 0D0A
+		$date = format_date($data); // Apr272020
 	} else {
 		$date = $data;
 	}
@@ -420,25 +404,42 @@ function ciscotools_lastchange($deviceid) {
     return $date;
 }
 
-function check_login_password( $deviceid){
-    $def_login = read_config_option('ciscotools_default_login');
-    $def_password = read_config_option('ciscotools_default_password');
-    
-    $dbquery = db_fetch_row_prepared("SELECT login, password FROM host WHERE id=?", array($deviceid));
+function create_ssh($deviceid) {
+	$dbquery = db_fetch_row_prepared("SELECT description, hostname, login, password FROM host WHERE id=?", array($deviceid));
     if( $dbquery === false ){
-        return; // no host to backup
+        return false; // no host to backup
     }
-    
-    $account=array();
+	
+	// look for the login/password on the device, or take the default one
+	$account=array();
     if(empty($dbquery['login'])) {
-        $account['login'] = $def_login;
-        $account['password'] = $def_password;
+        $account['login'] = read_config_option('ciscotools_default_login');
+        $account['password'] = read_config_option('ciscotools_default_password');
     } else {
         $account['login'] = $dbquery['login'];
         $account['password'] = $dbquery['password'];
     }
- 
-    return $account;
+ 	
+	// open the ssh stream to the device
+ 	$stream = open_ssh($dbquery['hostname'], $account['login'], $account['password']);
+	if($stream !== false){
+		$data = ssh_read_stream($stream );
+		if( $data === false ){
+			ciscotools_log( 'Erreur can\'t read login prompt');
+			return false;
+		}
+	}
+	return $stream;
 }
 
+function format_date($string)
+{
+    $regex = "/(Mon|Tue|Wed|Thu|Fri|Sat|Sun) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) ((0?[1-9]|[1-9][0-9]|100))( [0-9]{2}:[0-9]{2}:[0-9]{2} | )([0-9]{4})/";
+    preg_match($regex, $string, $result);
+
+    $regexHour = "/[0-9]{2}:[0-9]{2}:[0-9]{2} /";
+    $date = preg_replace($regexHour, '', $result[0]);
+
+    return date("Ymd", strtotime($date));
+}
 ?>

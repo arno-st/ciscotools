@@ -198,6 +198,7 @@ function ciscotools_config_arrays () {
 
 	$ciscotools_backup_frequencies = array(
 		"0" => "Disabled",
+		"1800" => "Every half hours",
 		"3600" => "Every hours",
 		"86400" => "Every Day",
 		"604800" => "Every Week",
@@ -469,7 +470,7 @@ function ciscotools_poller_bottom () {
 	include_once($config["library_path"] . "/database.php");
 
 	// Upgrade Poller
-	$pollerIntervalUpgrade = "300"; // 5 minutes
+	$pollerIntervalUpgrade = "60"; // 60: 1 minute | 300: 5 minutes
 	$lastPoller = read_config_option('ciscotools_upgrade_lastPoll'); // See when was the last poll for an upgrade
 	
 	if((time() - $lastPoller) <= $pollerIntervalUpgrade)

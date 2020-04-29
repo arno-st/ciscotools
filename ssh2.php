@@ -58,16 +58,15 @@ function ssh_read_stream($stream) {
     if(strlen($output)!=0) {
         return $output;
     }
-    else {
-        ciscotools_log('cmdSSH - Error - No output');
-        return false;
-    }
+    
+    ciscotools_log('ssh_read_stream - Error - No output');
+    return false;
 }
 
 function ssh_write_stream( $stream, $cmd){
     do {
 	$write = fwrite( $stream, $cmd.PHP_EOL );
-    echo 'ecrit:'.$write.PHP_EOL;
+    ciscotools_log( 'ecrit:'.$write);
 	} while( $write < strlen($cmd) );
 
 }
