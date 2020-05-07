@@ -35,11 +35,10 @@ function open_ssh( $hostname, $username, $password ) {
    }
 
     $stream = ssh2_shell($connection, 'vt100', null, 80, 24, SSH2_TERM_UNIT_CHARS );
-	stream_set_timeout($stream, 10);
+	stream_set_timeout($stream, 210);
 	stream_set_blocking($stream, true);
 
     return $stream;
-
 }
 
 function close_ssh($connection) {
@@ -53,6 +52,10 @@ function ssh_read_stream($stream) {
 		$stream_out = fread ($stream, 1);
         // ciscotools_log('stream read: >'.$stream_out.'<('.strlen($stream_out).')'.' hex:'.bin2hex($stream_out));
 		$output .= $stream_out;
+        // if the terminal is waiting to go for the next screen, just issue a space to go one
+        if( strpos($output, "--More--" ) !== false ) {
+            ssh_write_stream($stream, ' ' );
+        }
      } while ( !feof($stream) && $stream_out !== false && $stream_out != '#');
    
     if(strlen($output)!=0) {
@@ -66,8 +69,6 @@ function ssh_read_stream($stream) {
 function ssh_write_stream( $stream, $cmd){
     do {
 	$write = fwrite( $stream, $cmd.PHP_EOL );
-    ciscotools_log( 'ecrit:'.$write);
 	} while( $write < strlen($cmd) );
-
 }
 ?>

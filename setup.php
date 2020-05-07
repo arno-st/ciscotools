@@ -22,6 +22,7 @@
  +-------------------------------------------------------------------------+
 */
 
+include_once($config['base_path'] . '/plugins/ciscotools/display_backup.php');
 include_once($config['base_path'] . '/plugins/ciscotools/backup.php');
 include_once($config['base_path'] . '/plugins/ciscotools/upgrade.php');
 
@@ -41,6 +42,10 @@ function plugin_ciscotools_install () {
 	api_plugin_register_hook('ciscotools', 'top_header_tabs', 'ciscotools_show_tab', 'setup.php'); // display when into console tab
 	api_plugin_register_hook('ciscotools', 'top_graph_header_tabs', 'ciscotools_show_tab', 'setup.php'); // display when clicked tabs
 	api_plugin_register_hook('ciscotools', 'draw_navigation_text', 'ciscotools_draw_navigation_text', 'setup.php'); // nav bar under console and graph tab
+
+// Utilities
+	api_plugin_register_hook('ciscotools', 'utilities_action', 'ciscotools_utilities_action', 'setup.php');
+	api_plugin_register_hook('ciscotools', 'utilities_list', 'ciscotools_utilities_list', 'setup.php');
 
 	api_plugin_register_realm('ciscotools', 'upgrade.php', 'Plugin -> Upgrade', 1);
 	api_plugin_register_realm('ciscotools', 'ciscotools_tab.php,backup.php', 'Plugin -> Backups', 1);
@@ -145,7 +150,7 @@ function ciscotools_setup_tables() {
 	api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_modele', $data);
 
 /* insert values in plugin_ciscotools_modele */
-	db_execute("INSERT INTO `plugin_ciscotools_modele` "
+	db_execute("REPLACE INTO `plugin_ciscotools_modele` "
 		."(`id`, `snmp_SysObjectId`, `oid_modele`, `modele`, `image`, `sshCmds_version`) VALUES "
 		."(NULL, 'iso.3.6.1.4.1.9.1.2560', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'IR807G-LTE-GA-K9', 'ir800l-universalk9-mz.SPA.159-3.M.bin', 'dir|show version', '1'),"
 		."(NULL, 'iso.3.6.1.4.1.9.1.1497', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'C819G-4G-G-K9', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'dir|show version', '1'),"
@@ -169,10 +174,7 @@ function ciscotools_setup_tables() {
 		."(NULL, 'iso.3.6.1.4.1.9.1.2134', '1.3.6.1.2.1.47.1.1.1.1.13.1001', 'WS-C3560CX-12PC-S', 'c3560cx-universalk9-mz.152-6.E2.bin', 'dir|show version', '1'),"
 		."(NULL, 'iso.3.6.1.4.1.9.1.1745', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'WS-C3850-24XS-S', 'cat3k_caa-universalk9.16.06.06.SPA.bin', 'dir|show version', '1'),"
 		."(NULL, 'iso.3.6.1.4.1.9.1.2694', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'C9200L-24P-4G-E', 'cat9k_lite_iosxe.16.09.05.SPA.bin', 'dir|more flash:.installer/install_add_oper.log', '2'),"
-		."(NULL, 'iso.3.6.1.4.1.9.1.2593', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'C9500-16X', 'cat9k_iosxe.16.09.05.SPA.bin', 'dir|more flash:.installer/install_add_oper.log', '2'),"
-		."(NULL, 'iso.3.6.1.4.1.9.1.1732', '1.3.6.1.2.1.47.1.1.1.1.13.1000', 'WS-C4500X-32', 'cat4500e-universalk9.SPA.03.06.05.E.152-2.E5.bin', 'dir|show version', '1') "
-		."ON DUPLICATE KEY UPDATE id=id;");
-
+		."(NULL, 'iso.3.6.1.4.1.9.1.2593', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'C9500-16X', 'cat9k_iosxe.16.09.05.SPA.bin', 'dir|more flash:.installer/install_add_oper.log', '2')");
 }
 
 function plugin_ciscotools_version () {
@@ -188,7 +190,7 @@ function ciscotools_check_dependencies() {
 }
 
 function ciscotools_config_arrays () {
-	global $ciscotools_console_type,$ciscotools_backup_frequencies;
+	global $ciscotools_console_type,$ciscotools_backup_frequencies,$ciscotools_retention_duration;
 
 	$ciscotools_console_type = array(
 		"0" => "Disabled",
@@ -205,6 +207,15 @@ function ciscotools_config_arrays () {
 		"1209600" => "Every 2 Weeks",
 		"2419200" => "Every 4 Weeks"
 		);
+
+	$ciscotools_retention_duration = array(
+		"0" => "Disabled",
+		"-1 days" => "1 day",
+		"-1 months" => "1 month",
+		"-6 months" => "6 months",
+		"-1 years" => "1 year"
+		);
+
 
 }
 
@@ -272,7 +283,7 @@ function ciscotools_config_form () {
 }
 
 function ciscotools_config_settings () {
-	global $tabs, $settings, $ciscotools_console_type, $ciscotools_backup_frequencies;;
+	global $tabs, $settings, $ciscotools_console_type, $ciscotools_backup_frequencies, $ciscotools_retention_duration;
 
 	if (isset($_SERVER['PHP_SELF']) && basename($_SERVER['PHP_SELF']) != 'settings.php')
 		return;
@@ -342,6 +353,13 @@ function ciscotools_config_settings () {
 			'default' => '0',
 			'array' => $ciscotools_backup_frequencies,
 		),
+		'ciscotools_retention_duration' => array(
+			'friendly_name' => 'Rentention Duration',
+			'description' => "How long do we keep the backup.",
+			'method' => "drop_array",
+			'default' => '0',
+			'array' => $ciscotools_retention_duration,
+		),
 		'ciscotools_log_debug' => array(
 			'friendly_name' => 'Debug Log',
 			'description' => 'Enable logging of debug messages for ciscotools',
@@ -354,7 +372,6 @@ function ciscotools_config_settings () {
 function ciscotools_api_device_new($hostrecord_array) {
 	// don't do it for disabled
 	if( $hostrecord_array['disabled'] == 'on'  ) {
-ciscotools_log('end api device new disabled');
 		return $hostrecord_array;
 	}
 
@@ -365,7 +382,8 @@ ciscotools_log('end api device new disabled');
 			$hostrecord_array['id']);
 
 	// don't do it for not Cisco type	
-	if( mb_stripos($hostrecord_array['snmp_sysDescr'], "cisco") == false) {
+	if( mb_stripos($hostrecord_array['snmp_sysDescr'], "cisco") === false) {
+ciscotools_log('Device Type:'.$hostrecord_array['snmp_sysDescr']);
 		return $hostrecord_array;
 	}
 
@@ -378,35 +396,34 @@ ciscotools_log('end api device new disabled');
 	if (isset($_POST['password'])) {
 		$hostrecord_array['password'] = form_input_validate($_POST['password'], 'password', '', true, 3);
 	} else {
-		$hostrecord_array['password'] = form_input_validate('off', 'password', '', true, 3);
+		$hostrecord_array['password'] = form_input_validate('', 'password', '', true, 3);
 	}
 	
 	if (isset($_POST['console_type'])) {
 		$hostrecord_array['console_type'] = form_input_validate($_POST['console_type'], 'console_type', '', true, 3);
 	} else {
-		$hostrecord_array['console_type'] = form_input_validate('off', 'console_type', '', true, 3);
+		$hostrecord_array['console_type'] = form_input_validate('', 'console_type', '', true, 3);
 	}
 
 	if (isset($_POST['can_be_upgraded'])) {
 		$hostrecord_array['can_be_upgraded'] = form_input_validate($_POST['can_be_upgraded'], 'can_be_upgraded', '', true, 3);
 	} else {
-		$hostrecord_array['can_be_upgraded'] = form_input_validate('off', 'can_be_upgraded', '', true, 3);
+		$hostrecord_array['can_be_upgraded'] = form_input_validate('', 'can_be_upgraded', '', true, 3);
 	}
 	
 	if (isset($_POST['can_be_rebooted'])) {
 		$hostrecord_array['can_be_rebooted'] = form_input_validate($_POST['can_be_rebooted'], 'can_be_rebooted', '', true, 3);
 	} else {
-		$hostrecord_array['can_be_rebooted'] = form_input_validate('off', 'can_be_rebooted', '', true, 3);
+		$hostrecord_array['can_be_rebooted'] = form_input_validate('', 'can_be_rebooted', '', true, 3);
 	}
 
 	if (isset($_POST['do_backup'])) {
 		$hostrecord_array['do_backup'] = form_input_validate($_POST['do_backup'], 'do_backup', '', true, 3);
 	} else {
-		$hostrecord_array['do_backup'] = form_input_validate('off', 'do_backup', '', true, 3);
+		$hostrecord_array['do_backup'] = form_input_validate('', 'do_backup', '', true, 3);
 	}
 
 	sql_save($hostrecord_array, 'host');
-ciscotools_log('end api device new');
 	
 	return $hostrecord_array;
 }
@@ -473,12 +490,10 @@ function ciscotools_poller_bottom () {
 	$pollerIntervalUpgrade = "60"; // 60: 1 minute | 300: 5 minutes
 	$lastPoller = read_config_option('ciscotools_upgrade_lastPoll'); // See when was the last poll for an upgrade
 	
-	if((time() - $lastPoller) <= $pollerIntervalUpgrade)
-	{
+	if((time() - $lastPoller) <= $pollerIntervalUpgrade) {
 		ciscotools_log("[POLLER] Upgrade: time: " . time() . " | lp: " . $lastPoller . " | poller: " . $pollerIntervalUpgrade . " | diff: " . (time() - $lastPoller));
 	}
-	else
-	{
+	else {
 		ciscotools_log("[POLLER] Upgrade: the upgrade can begin!");
 		$queueChecking = checkQueue();
 		set_config_option('ciscotools_upgrade_lastPoll', time()); // Set the last poll for an upgrade check
@@ -509,16 +524,21 @@ function ciscotools_poller_bottom () {
 	
 	ciscotools_log('Go time: '.time().' lp: '. $lp .' poller: '. $poller_interval.' diff: '.(time() - $lp));
 
-	ciscotools_checkbackup();
+	// this function take too long to call it directly, we have to call it in background
+	// a check has to be made to be sure not to run it twice
+	$command_string = trim(read_config_option('path_php_binary'));
 
-/*
 	// If its not set, just assume its in the path
 	if (trim($command_string) == '')
 		$command_string = 'php';
-	$extra_args = ' -q ' . $config['base_path'] . '/plugins/ciscotools/backup.php';
+	$extra_args = ' -q ' . $config['base_path'] . '/plugins/ciscotools/check_backup.php';
+	if( read_config_option('ciscotools_backup_running') != 'on' ) {
+		set_config_option('ciscotools_backup_running', 'on');
+		exec_background($command_string, $extra_args);
+	}
 
-	exec_background($command_string, $extra_args);
-*/	
+// purge poller, test is made only when we should do a backup, to avoid overload of the pooler bottom
+	purge_backup();
 }
 
 function ciscotools_show_tab () {
@@ -543,6 +563,46 @@ function ciscotools_draw_navigation_text ($nav) {
 		'level' => '1'
 	);
 	return $nav;
+}
+function ciscotools_utilities_list () {
+	global $colors;
+	html_header(array("Ciscotools Plugin"), 2);
+	form_alternate_row();
+	?>
+		<td class="textArea">
+			<a href='utilities.php?action=ciscotools_retention'>Backup Retention Check</a>
+		</td>
+		<td class="textArea">
+			Check the Retention Date of the Backup, and Purge if Necessary
+		</td>
+	<?php
+	form_end_row();
+	form_alternate_row();
+	?>
+		<td class="textArea">
+			<a href='utilities.php?action=ciscotools_purge'>Remove all backup</a>
+		</td>
+		<td class="textArea">
+			Remove all backup from DB.
+		</td>
+	<?php
+	form_end_row();
+}
+
+function ciscotools_utilities_action ($action) {
+	if ($action == 'ciscotools_retention') {
+		purge_backup();
+		include_once('./include/top_header.php');
+		utilities();
+		include_once('./include/bottom_footer.php');
+	} else if ($action == 'ciscotools_purge') {
+		cacti_log( 'Remove all backup', false, 'CISCOTOOLS' );
+		db_execute( 'TRUNCATE TABLE plugin_ciscotools_backup' );
+		include_once('./include/top_header.php');
+		utilities();
+		include_once('./include/bottom_footer.php');
+	}
+	return $action;
 }
 
 function ciscotools_log( $text ){
