@@ -28,7 +28,6 @@ include_once($config['base_path'] . '/plugins/ciscotools/ssh2.php');
 At the call we receive the ID of the device.
 */
 function ciscotools_backup($deviceid) {
-ciscotools_log('start backup function');
 	$querybackupversion = db_fetch_cell("SELECT version FROM plugin_ciscotools_backup WHERE host_id=".$deviceid." ORDER BY version DESC LIMIT 1");
 
 	$stream = create_ssh($deviceid);
@@ -68,13 +67,11 @@ function ciscotools_lastchange($deviceid) {
     sh run | inc configuration change            D   M   d y
     ! Last configuration change at 12:28:03 LSN Wed Apr 8 2020 by a_soi_0518
     */
-	ciscotools_log( 'Check last change of:' .$deviceid);
     $dbquery = db_fetch_row_prepared("SELECT description, hostname FROM host WHERE id=?", array($deviceid));
     if( $dbquery === false ){
         return false; // no host to backup
     }
 
-	ciscotools_log( 'open ssh to:' .$deviceid);
 	$stream = create_ssh($deviceid);
 	if($stream === false){
 		return false;
@@ -86,7 +83,6 @@ function ciscotools_lastchange($deviceid) {
 		ciscotools_log( 'Erreur can\'t read version');
 		return false;
 	}
-	ciscotools_log( 'get version date:' .$data);
 	
 	if($data !== false ) {
 		$data = substr($data, strpos($data, "\n")+1); // clean up start of the string +1 for 0A
@@ -149,6 +145,11 @@ function create_ssh($deviceid) {
 }
 
 function format_date($string) {
+	// if no backup, just fake the date
+	if( strpos( $string, 'configuration change since last restart' ) ) {
+		return '19700101';
+	}
+	
     $regex = "/(Mon|Tue|Wed|Thu|Fri|Sat|Sun) (Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)(.*?)((0?[1-9]|[1-9][0-9]|100))( [0-9]{2}:[0-9]{2}:[0-9]{2} | )([0-9]{4})/";
     preg_match($regex, $string, $result);
 

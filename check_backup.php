@@ -41,20 +41,20 @@ include_once($config['base_path'] . '/plugins/ciscotools/setup.php');
     // backup for every Cisco device or not ?, if TRUE, then exclude device that are FALSE or not Cisco
     /*
     By default we take the value from ciscotools_default_do_backup, to decide what to do
-    But if a device is volontary setup to disable, we don't do the backup.
+    But if a device is volontary setup to disable or down, we don't do the backup.
     If we don't force by default the backup, we do it only on enabled device
     */
     if( read_config_option('ciscotools_default_do_backup') == 'on') { 
-        $sqlqueryfilter = "do_backup!='off' AND snmp_sysObjectID LIKE 'iso.3.6.1.4.1.9%' AND disabled !='on'"; 
+        $sqlqueryfilter = "do_backup!='off' AND snmp_sysObjectID LIKE 'iso.3.6.1.4.1.9%' AND disabled !='on' AND status ='3'"; 
     } else {
-        $sqlqueryfilter = "do_backup='on' AND snmp_sysObjectID LIKE 'iso.3.6.1.4.1.9%' AND disabled !='on'";
+        $sqlqueryfilter = "do_backup='on' AND snmp_sysObjectID LIKE 'iso.3.6.1.4.1.9%' AND disabled !='on' AND status ='3'";
     }
     $dbquery = db_fetch_assoc("SELECT id, description, hostname FROM host WHERE ".$sqlqueryfilter);
     if( $dbquery === false ){
         cacti_log('No device to backup', false, 'CISCOTOOLS');
         return; // no host to backup
     }
-    ciscotools_log("need to check backup :". count($dbquery)." hosts" );
+    ciscotools_log("need to check backup on :". count($dbquery)." hosts" );
     
     // do backup for all device discovered
     foreach( $dbquery as $host ){
@@ -62,15 +62,16 @@ include_once($config['base_path'] . '/plugins/ciscotools/setup.php');
         $lastchange = ciscotools_lastchange($host['id']);
         if($lastchange === false ) {
 			cacti_log('Device: '.$host['description']. ' can not read version', false, 'CISCOTOOLS');
-			return;
+			continue;
 		}
+        ciscotools_log('lastchange: '.$lastchange );
 
         // check if it's time to backup, depending of the last change recorded
         $savedchange = db_fetch_cell("SELECT datechange FROM plugin_ciscotools_backup WHERE host_id=".$host['id']." ORDER BY version DESC LIMIT 1");
-        ciscotools_log('query: '.$savedchange );
+
         if($lastchange > $savedchange || empty($savedchange) ){
-            ciscotools_log('Device: '.$host['description']. ' need backup '.$lastchange .' backup: '.$savedchange);
-            ciscotools_backup($host['id']);
+            cacti_log('Device: '.$host['description']. ' need backup '.$lastchange .' backup: '.$savedchange);
+            ciscotools_backup($host['id'], false, 'CISCOTOOLS');
         } else ciscotools_log('Device: '.$host['description']. ' no diff since last backup');
     }
 	

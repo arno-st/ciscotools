@@ -24,7 +24,7 @@
 
 include_once($config['base_path'] . '/plugins/ciscotools/display_backup.php');
 include_once($config['base_path'] . '/plugins/ciscotools/backup.php');
-include_once($config['base_path'] . '/plugins/ciscotools/upgrade.php');
+//include_once($config['base_path'] . '/plugins/ciscotools/upgrade.php');
 
 function plugin_ciscotools_install () {
 	api_plugin_register_hook('ciscotools', 'config_arrays', 'ciscotools_config_arrays', 'setup.php'); // array used by this plugin
@@ -47,7 +47,7 @@ function plugin_ciscotools_install () {
 	api_plugin_register_hook('ciscotools', 'utilities_action', 'ciscotools_utilities_action', 'setup.php');
 	api_plugin_register_hook('ciscotools', 'utilities_list', 'ciscotools_utilities_list', 'setup.php');
 
-	api_plugin_register_realm('ciscotools', 'upgrade.php', 'Plugin -> Upgrade', 1);
+//	api_plugin_register_realm('ciscotools', 'upgrade.php', 'Plugin -> Upgrade', 1);
 	api_plugin_register_realm('ciscotools', 'ciscotools_tab.php,backup.php', 'Plugin -> Backups', 1);
 	
 	ciscotools_setup_tables();
@@ -88,7 +88,7 @@ function ciscotools_check_upgrade() {
 			webpage='" . $version['homepage'] . "' 
 			WHERE directory='" . $version['name'] . "' ");
 	
-			if( $old < '1.0' ) {
+			if( $old < '1.1' ) {
 			}
 	}
 
@@ -123,7 +123,7 @@ function ciscotools_setup_tables() {
 	api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_backup', $data);
 
 /* table to keep a queue of upgrade */
-	unset($data);
+/*	unset($data);
 	$data = array();
 	$data['columns'][] = array('name' => 'id', 'type' => 'mediumint(8)', 'auto_increment'=>'');
 	$data['columns'][] = array('name' => 'host_id', 'type' => 'mediumint(8)', 'NULL' => false, 'default' => '0');
@@ -134,9 +134,9 @@ function ciscotools_setup_tables() {
 	$data['keys'][] = array('name' => 'host_id', 'columns' => 'host_id');
 	$data['type'] = 'InnoDB';
 	api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_queueupgrade', $data);
-
+*/
 /* table to keep diff info for modele/version */
-	unset($data);
+/*	unset($data);
 	$data = array();
 	$data['columns'][] = array('name' => 'id', 'type' => 'mediumint(8)', 'auto_increment'=>'');
 	$data['columns'][] = array('name' => 'snmp_SysObjectId', 'type' => 'varchar(128)', 'NULL' => false);
@@ -148,9 +148,9 @@ function ciscotools_setup_tables() {
 	$data['keys'][] = array('name' => 'modele', 'columns' => 'modele');
 	$data['type'] = 'InnoDB';
 	api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_modele', $data);
-
+*/
 /* insert values in plugin_ciscotools_modele */
-	db_execute("REPLACE INTO `plugin_ciscotools_modele` "
+/*	db_execute("REPLACE INTO `plugin_ciscotools_modele` "
 		."(`id`, `snmp_SysObjectId`, `oid_modele`, `modele`, `image`, `sshCmds_version`) VALUES "
 		."(NULL, 'iso.3.6.1.4.1.9.1.2560', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'IR807G-LTE-GA-K9', 'ir800l-universalk9-mz.SPA.159-3.M.bin', 'dir|show version', '1'),"
 		."(NULL, 'iso.3.6.1.4.1.9.1.1497', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'C819G-4G-G-K9', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'dir|show version', '1'),"
@@ -175,6 +175,7 @@ function ciscotools_setup_tables() {
 		."(NULL, 'iso.3.6.1.4.1.9.1.1745', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'WS-C3850-24XS-S', 'cat3k_caa-universalk9.16.06.06.SPA.bin', 'dir|show version', '1'),"
 		."(NULL, 'iso.3.6.1.4.1.9.1.2694', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'C9200L-24P-4G-E', 'cat9k_lite_iosxe.16.09.05.SPA.bin', 'dir|more flash:.installer/install_add_oper.log', '2'),"
 		."(NULL, 'iso.3.6.1.4.1.9.1.2593', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'C9500-16X', 'cat9k_iosxe.16.09.05.SPA.bin', 'dir|more flash:.installer/install_add_oper.log', '2')");
+*/
 }
 
 function plugin_ciscotools_version () {
@@ -485,7 +486,7 @@ function ciscotools_poller_bottom () {
 
 	include_once($config['library_path'] . '/poller.php');
 	include_once($config["library_path"] . "/database.php");
-
+/*
 	// Upgrade Poller
 	$pollerIntervalUpgrade = "60"; // 60: 1 minute | 300: 5 minutes
 	$lastPoller = read_config_option('ciscotools_upgrade_lastPoll'); // See when was the last poll for an upgrade
@@ -504,7 +505,7 @@ function ciscotools_poller_bottom () {
 		 * 2 - check upload
 		 * 3 - checkVersion
 		 */
-	}
+//	}
 
 	// Backup Poller
 	$poller_interval = read_config_option('ciscotools_check_backup');
@@ -533,8 +534,11 @@ function ciscotools_poller_bottom () {
 		$command_string = 'php';
 	$extra_args = ' -q ' . $config['base_path'] . '/plugins/ciscotools/check_backup.php';
 	if( read_config_option('ciscotools_backup_running') != 'on' ) {
+		cacti_log('Start Backup', false, 'CISCOTOOLS');
 		set_config_option('ciscotools_backup_running', 'on');
 		exec_background($command_string, $extra_args);
+	} else {
+		cacti_log('Backup is running', false, 'CISCOTOOLS');
 	}
 
 // purge poller, test is made only when we should do a backup, to avoid overload of the pooler bottom

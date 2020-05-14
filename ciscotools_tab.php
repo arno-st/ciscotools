@@ -30,9 +30,29 @@ set_default_action('backup');
 switch(get_request_var('action')) {
 	case 'diff':
 		general_header();
-		ciscotools_tabs();
 		$deviceid = get_request_var('deviceid');
-		$deviceid?ciscotools_diff():ciscotools_displaybackup();
+		if( $deviceid ) {
+			ciscotools_tabs();
+			ciscotools_diff();
+		} else  {
+			set_request_var('action', 'backup' );
+			ciscotools_tabs();
+			ciscotools_displaybackup();
+		}
+		bottom_footer();
+		break;
+
+	case 'output':
+		general_header();
+		$versionid = get_request_var('versionid');
+		if( $versionid ) {
+			ciscotools_tabs();
+			ciscotools_output();
+		} else  {
+			set_request_var('action', 'backup' );
+			ciscotools_tabs();
+			ciscotools_displaybackup();
+		}
 		bottom_footer();
 		break;
 
@@ -51,7 +71,8 @@ function ciscotools_tabs() {
 	/* present a tabbed interface */
 	$tabs = array(
 		'backup'    => __('Backup', 'ciscotools'),
-		'diff'      => __('Diff', 'ciscotools')
+		'diff'      => __('Diff', 'ciscotools'),
+		'output'      => __('Output', 'ciscotools')
 	);
 
 	get_filter_request_var('tab', FILTER_VALIDATE_REGEXP, array('options' => array('regexp' => '/^([a-zA-Z]+)$/')));

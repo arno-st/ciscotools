@@ -63,6 +63,14 @@ function ciscotools_displaybackup() {
 	if ($description != '') {
 		$sql_where .= " AND " . "host.description like '%$description%'";
 	}
+
+	general_header();
+	// how many backup we have
+	$total_rows = db_fetch_cell( "SELECT count(host.id)
+			FROM host, plugin_ciscotools_backup pctb
+			WHERE host.id=pctb.host_id".
+			$sql_where );
+			
 	/* if the number of rows is -1, set it to the default */
 	if (get_request_var("rows") == "-1") {
 		$per_row = read_config_option('num_rows_table'); //num_rows_device');
@@ -72,18 +80,34 @@ function ciscotools_displaybackup() {
 	$page = ($per_row*(get_request_var('page')-1));
 	$sql_limit = $page . ',' . $per_row;
 	
-	general_header();
-	
 	$sql_query = "SELECT host.id as 'id', 
-			host.description as 'description', host.hostname as 'hostname', pctb.version as version, pctb.datechange as date, count(*) as count
+			host.description as 'description', host.hostname as 'hostname', pctb.version as version, pctb.datechange as date
 			FROM host, plugin_ciscotools_backup pctb
 			WHERE host.id=pctb.host_id
 			$sql_where
 			ORDER BY $sortby
 			LIMIT " . $sql_limit;
-	
-	$result = db_fetch_assoc($sql_query);
-	$total_rows = count($result);
+			
+	$result = db_fetch_assoc($sql_query); // query result is one entry par backup
+	// get last date, and count how many backup per 1 host, can't do in the sql query
+	$devices = array();
+	$i = 0;
+	foreach( $result as $entry ) {
+		$id = $entry['id'];
+		if (isset($devices[$id]) ) { 
+			$devices[$id]['count']++;
+			if ($devices[$id]['date'] < $entry['date'] ) {
+				$devices[$id]['date'] = $entry['date'];
+			}
+		} else {
+			$devices[$id]['id'] = $id;
+			$devices[$id]['description'] = $entry['description'];
+			$devices[$id]['hostname'] = $entry['hostname'];
+			$devices[$id]['date'] = $entry['date'];
+			$devices[$id]['count'] = 1;
+		}
+		$i++;
+	}
 	?>
 	
 	<script type="text/javascript">
@@ -153,28 +177,28 @@ function ciscotools_displaybackup() {
 		"id" => array("Host ID", "ASC"),
 		"hostname" => array("Hostname", "ASC"),
 		"description" => array("Description", "ASC"),
-		"version" => array("version", "ASC"),
-		"date" => array("Backup Date", "ASC"),
+		"nbversion" => array("Number of Version", "ASC"),
+		"date" => array("Last Backup Date", "ASC"),
 		"diff" => array("Backup or Diff", ""),
 		"nosort" => array("", ""));
 	
 	html_header_sort($display_text, get_request_var("sort_column"), get_request_var("sort_direction"), false);
 
 	$i=0;
-	if (!empty($result)) {
+	if (!empty($devices)) {
 			$class   = 'odd';
-			foreach($result as $row) {
+			foreach($devices as $row) {
 					($class == 'odd' )?$class='even':$class='odd';
-	
+					$type_string = ($row['count']>1)?'>DIFF':'>Backup';
 					print"<tr class='$class'>";
 					print"<td style='padding: 4px; margin: 4px;'>"
 							. $row['id'] . '</td>
 							<td>' . $row['hostname'] . '</td>
 							<td>' . $row['description'] . '</td>
-							<td>' . $row['version'] . '</td>
+							<td>' . $row['count'] . '</td>
 							<td>' . $row['date'] . '</td>
 							<td>';
-					print '<a href=ciscotools_tab.php?action=diff&deviceid=' . $row['id'] . ($row['count'] > 1)?'>DIFF<':'<Backup>'."/a></td><td align='right'>";
+					print   '<a href=ciscotools_tab.php?action=diff&deviceid=' . $row['id'] . $type_string . "</a></td><td align='right'>";
 					print "</tr>";
 		}
 	}else{
@@ -209,39 +233,48 @@ function ciscotools_diff() {
 
 	/* display row  and page settings */
 	$total_backup = (count($result)!==false)?count($result):1;
-	$backupid = min(array_column($result, 'version'))-1; // array_column return a one based, and array is using 0 based count
+	$backupid = min(array_column($result, 'version'))-1; // array_column return a one based, and array is using 0 based count, look for the first backup version
 	$diffids = array_slice($result, $backupid+1 ); // remove the lowest backup, and kepp all other to find the diff, null if only 1 backup
 	
-	// TOP DEVICE SELECTION
-	html_start_box('', '100%', '', '3', 'center', '');
-   
-	$nav = html_nav_bar('ciscotools_tab.php', 1, 1, $total_backup, $total_backup, 30, 'of '.$result[$backupid]['description']
-	. ' backup date: '.$result[$backupid]['date'] . ' version: '.$result[$backupid]['version']);
-
-	print $nav;
-
+	// TOP DEVICE DISPLAY
+	$start_text = 'Cisco Tools all ' .$total_backup . ' of '
+	.$result[$backupid]['description']
+	. ' backup date: '.$result[$backupid]['date'] 
+	. ' version: '.$result[$backupid]['version'];
+	
+	html_start_box($start_text, '100%', '', '3', 'center', '');
+ 
 	if (!empty($result)) {
 			print "<div>";
-			print 	"<table><tbody>";
+			print 	"<table style='width=100%;'><tbody>";
 			print 		'<tr>';
-			print			"<td >".'Config base';
-			print 				"<div style='border: 1px solid black;width: 75%'>" . nl2br($result[$backupid]['diff']) . '</div>';
+			print			'<td >'."<a href='ciscotools_tab.php?action=output&versionid=".$result[$backupid]['id']."'>Config base".'<a/>';
+			print 				"<div style='border: 1px solid black;width=50%;background:#E5E5E5;position: relative;'>" . nl2br($result[$backupid]['diff']) . '</div>';
 			print			'</td>';
+		// display all change, one under the previous one
 			if($total_backup > 1){
-				print 			'<td>';
-				foreach( $diffids as $diffid ) { // number of different version
-					$diff_array = $obj_diff->compare($result[$backupid]['diff'], $diffid['diff']);
-					print			'Diff Date '.$diffid['date'];
-					print	 			"<div style='border: 1px solid black;width: 75%'>";
+				$previous = $result[$backupid]; // set the previous backup is first backup
+				print	"<td style='border: 1px solid black;width: 100%;background:#E5E5E5;position: relative;'>";
+				foreach( $result as $diffid ) { // number of different version
+					if( $diffid['version'] == $result[$backupid]['version'] ) {
+						continue;
+					}
+					$diff_array = $obj_diff->compare($previous['diff'], $diffid['diff']);
+					print	"<a href='ciscotools_tab.php?action=output&versionid=".$diffid['id']."'>Diff Date".$diffid['date'].'<a/>';
+					print	"<div style='border: 1px solid black;width: 100%;background:#E5E5E5;position: relative;'>";
+					$linecount=0;
 					foreach( $diff_array as $line ){ // for each line look what is the diff
       					switch ($line[1]){
         					case $obj_diff::UNMODIFIED;break;
-       						case $obj_diff::DELETED    : print '--' . $line[0];break;
-        					case $obj_diff::INSERTED   : print '++' . $line[0];break;
+       						case $obj_diff::DELETED    : print $linecount . ' -- ' . $line[0].'<br/>';break;
+        					case $obj_diff::INSERTED   : print $linecount . ' ++ ' . $line[0].'<br/>';break;
       					}
+						$linecount ++;
 					}
+					
 					print '</div>';
 					print			'<br>';
+					$previous = $diffid;
 				}
 				print 			'</td>';
 			}
@@ -260,5 +293,46 @@ function ciscotools_diff() {
 	
 	bottom_footer();
 
+}
+
+function ciscotools_output() {
+    global $config;
+	/* ================= input validation ================= */
+	input_validate_input_number(get_request_var("versionid"));
+	/* ==================================================== */
+	$versionid = get_request_var('versionid');
+	/* ================= input validation ================= */
+	input_validate_input_number(get_request_var("page"));
+	input_validate_input_number(get_request_var("rows"));
+	/* ==================================================== */
+
+	general_header();
+	
+	$sql_query = 'SELECT host.id as id, 
+			host.description as description, host.hostname as hostname, pctb.version as version, pctb.datechange as date, pctb.diff as config
+			FROM plugin_ciscotools_backup pctb
+			INNER JOIN host ON host.id=pctb.host_id
+			WHERE pctb.id ='. $versionid;
+	
+	$result = db_fetch_row($sql_query); // query result is one entry par backup
+
+	$start_text = 'Cisco Tools output of the version '
+	. $result['version']
+	. ' for device: ' .$result['description'].', backup date:' .$result['date'];
+	
+	html_start_box($start_text, '100%', '', '3', 'center', '');
+ 		
+	if (!empty($result)) {
+			print	"<td >".'Config requested';
+			print	"<div style='border: 1px solid black;background:#E5E5E5;'>" . nl2br($result['config']) . '</div>';
+			print	'</td>';
+	} else{
+		print "<tr><td style='padding: 4px; margin: 4px;' colspan=11><center>There are no Backup to display!</center></td></tr>";
+	}
+	
+	html_end_box();
+		
+	bottom_footer();
+	
 }
 ?>

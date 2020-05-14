@@ -25,7 +25,7 @@
 function open_ssh( $hostname, $username, $password ) {
     $connection = ssh2_connect($hostname, 22);
     if($connection === false ) {
-        cacti_log( "can't open SSH session to ".$hostname."error: ".$connection, false, 'CISCOTOOLS');
+        cacti_log( "can't open SSH session to ".$hostname." error: ".$connection, false, 'CISCOTOOLS');
         return false;
     }
 
@@ -68,7 +68,7 @@ function ssh_read_stream($stream) {
 
 function ssh_write_stream( $stream, $cmd){
     do {
-	$write = fwrite( $stream, $cmd.PHP_EOL );
+        $write = fwrite( $stream, $cmd.PHP_EOL );
 	} while( $write < strlen($cmd) );
 }
 ?>
