@@ -405,23 +405,23 @@ ciscotools_log('Device Type:'.$hostrecord_array['snmp_sysDescr']);
 	} else {
 		$hostrecord_array['console_type'] = form_input_validate('', 'console_type', '', true, 3);
 	}
-
+// following change is present only if ON
 	if (isset($_POST['can_be_upgraded'])) {
 		$hostrecord_array['can_be_upgraded'] = form_input_validate($_POST['can_be_upgraded'], 'can_be_upgraded', '', true, 3);
 	} else {
-		$hostrecord_array['can_be_upgraded'] = form_input_validate('', 'can_be_upgraded', '', true, 3);
+		$hostrecord_array['can_be_upgraded'] = form_input_validate('off', 'can_be_upgraded', '', true, 3);
 	}
 	
 	if (isset($_POST['can_be_rebooted'])) {
 		$hostrecord_array['can_be_rebooted'] = form_input_validate($_POST['can_be_rebooted'], 'can_be_rebooted', '', true, 3);
 	} else {
-		$hostrecord_array['can_be_rebooted'] = form_input_validate('', 'can_be_rebooted', '', true, 3);
+		$hostrecord_array['can_be_rebooted'] = form_input_validate('off', 'can_be_rebooted', '', true, 3);
 	}
 
 	if (isset($_POST['do_backup'])) {
 		$hostrecord_array['do_backup'] = form_input_validate($_POST['do_backup'], 'do_backup', '', true, 3);
 	} else {
-		$hostrecord_array['do_backup'] = form_input_validate('', 'do_backup', '', true, 3);
+		$hostrecord_array['do_backup'] = form_input_validate('off', 'do_backup', '', true, 3);
 	}
 
 	sql_save($hostrecord_array, 'host');

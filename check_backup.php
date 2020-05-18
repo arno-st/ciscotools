@@ -76,4 +76,5 @@ include_once($config['base_path'] . '/plugins/ciscotools/setup.php');
     }
 	
 	set_config_option('ciscotools_backup_running', 'off'); // set the end of the process
+    cacti_log( 'Check backup ended', false, 'CISCOTOOLS');
 ?>

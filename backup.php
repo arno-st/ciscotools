@@ -42,10 +42,10 @@ function ciscotools_backup($deviceid) {
 		return;
 	}
 	
-	if ( ssh_write_stream($stream, 'sh run') === false ) return;
+	if ( ssh_write_stream($stream, 'sh start') === false ) return;
 	$data = ssh_read_stream($stream);
 	if( $data === false ){
-		ciscotools_log( 'Erreur can\'t read sh run');
+		ciscotools_log( 'Erreur can\'t read sh start');
 		return;
 	}
 	
@@ -64,7 +64,7 @@ function ciscotools_backup($deviceid) {
 
 function ciscotools_lastchange($deviceid) {
     /* retreive the last change date:
-    sh run | inc configuration change            D   M   d y
+    sh start | inc configuration change            D   M   d y
     ! Last configuration change at 12:28:03 LSN Wed Apr 8 2020 by a_soi_0518
     */
     $dbquery = db_fetch_row_prepared("SELECT description, hostname FROM host WHERE id=?", array($deviceid));
@@ -77,7 +77,7 @@ function ciscotools_lastchange($deviceid) {
 		return false;
 	}
 	
-	if(ssh_write_stream($stream, 'sh run | inc change|!Time' ) === false) return;
+	if(ssh_write_stream($stream, 'sh start | inc change|!Time' ) === false) return;
 	$data = ssh_read_stream($stream);
 	if( $data === false ){
 		ciscotools_log( 'Erreur can\'t read version');

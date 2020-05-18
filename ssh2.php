@@ -23,18 +23,18 @@
 */
 
 function open_ssh( $hostname, $username, $password ) {
-    $connection = ssh2_connect($hostname, 22);
+    $connection = @ssh2_connect($hostname, 22);
     if($connection === false ) {
         cacti_log( "can't open SSH session to ".$hostname." error: ".$connection, false, 'CISCOTOOLS');
         return false;
     }
 
-    if( !ssh2_auth_password($connection, $username, $password) ) {
+    if( !@ssh2_auth_password($connection, $username, $password) ) {
         cacti_log( "can't login to host ".$hostname." via SSH session, log: ".$username, false, 'CISCOTOOLS');
         return false;
    }
 
-    $stream = ssh2_shell($connection, 'vt100', null, 80, 24, SSH2_TERM_UNIT_CHARS );
+    $stream = @ssh2_shell($connection, 'vt100', null, 80, 24, SSH2_TERM_UNIT_CHARS );
 	stream_set_timeout($stream, 210);
 	stream_set_blocking($stream, true);
 
@@ -42,7 +42,7 @@ function open_ssh( $hostname, $username, $password ) {
 }
 
 function close_ssh($connection) {
-    ssh2_disconnect ($connection);
+    @ssh2_disconnect ($connection);
 }
 
 function ssh_read_stream($stream) {
