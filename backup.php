@@ -105,20 +105,39 @@ function purge_backup() {
 
 // return the number of backup per host
 	$sqlquery = "SELECT plugin_ciscotools_backup.host_id, host.description as description,
-			plugin_ciscotools_backup.datechange as date, plugin_ciscotools_backup.id as backupid
-			count (plugin_ciscotools_backup.host_id)
+			plugin_ciscotools_backup.datechange as date, plugin_ciscotools_backup.id as backupid,
+			count(plugin_ciscotools_backup.host_id) as count
 			FROM host 
 			INNER JOIN  plugin_ciscotools_backup ON plugin_ciscotools_backup.host_id=host.id
-			WHERE plugin_ciscotools_backup.datechange < '".$datetopurge."'";
+			WHERE plugin_ciscotools_backup.datechange < '".$datetopurge."'
+			 GROUP BY plugin_ciscotools_backup.host_id";
+
 	$sqlret = db_fetch_assoc($sqlquery); // if empty no backup
 	if($sqlret > 0 ) {
 		/* then each row contain id of host that has a backup, remove all host with backup of no more than 1
 		end delete, other until we keep only the last one
+		host_id	description	date	backupid	count
 		*/
 		foreach( $sqlret as $backup ) {
-			cacti_log('Remove Backup of : '.$backup['description'].' date: '.$datetopurge, false, 'CISCOTOOLS' );
-			$sqlcount = db_execute('SELECT count(*) FROM plugin_ciscotools_backup WHERE plugin_ciscotools_backup='.$backup['host_id'] );
-			db_execute( "DELETE FROM plugin_ciscotools_backup WHERE id='".$backup['backupid']."'");
+			if( $backup['count'] == '1' ) {
+				ciscotools_log('Only one backup for '. $backup['description']);
+				continue;
+			}
+			$sqlquery = "SELECT plugin_ciscotools_backup.host_id, host.description as description, plugin_ciscotools_backup.datechange as date, plugin_ciscotools_backup.id as backupid 
+			FROM host 
+			INNER JOIN plugin_ciscotools_backup ON plugin_ciscotools_backup.host_id=host.id 
+			WHERE plugin_ciscotools_backup.datechange < '".$datetopurge."'  
+			AND plugin_ciscotools_backup.host_id='".$backup['host_id']."' 
+			ORDER BY plugin_ciscotools_backup.datechange DESC LIMIT 1, 400";
+
+			$sqlbackup = db_fetch_assoc( $sqlquery );
+
+			// return an array of backup, and keep the first row [0]
+			$array_backup = array_column($sqlbackup, NULL, 'date');
+			foreach( $array_backup as $backupid ) {
+				cacti_log('Remove Backups of : '.$backupid['description'].' date: '.$backupid['date'], false, 'CISCOTOOLS' );
+				db_execute( "DELETE FROM plugin_ciscotools_backup WHERE id='".$backupid."'");
+			}
 		}
 	}
 }

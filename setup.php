@@ -214,8 +214,6 @@ function ciscotools_config_arrays () {
 		"-6 months" => "6 months",
 		"-1 years" => "1 year"
 		);
-
-
 }
 
 function ciscotools_config_form () {
@@ -382,7 +380,7 @@ function ciscotools_api_device_new($hostrecord_array) {
 
 	// don't do it for not Cisco type	
 	if( mb_stripos($hostrecord_array['snmp_sysDescr'], "cisco") === false) {
-ciscotools_log('Device Type:'.$hostrecord_array['snmp_sysDescr']);
+		ciscotools_log('Device Type:'.$hostrecord_array['snmp_sysDescr']);
 		return $hostrecord_array;
 	}
 
@@ -530,7 +528,7 @@ function ciscotools_poller_bottom () {
 	// If its not set, just assume its in the path
 	if (trim($command_string) == '')
 		$command_string = 'php';
-	$extra_args = ' -q ' . $config['base_path'] . '/plugins/ciscotools/check_backup.php';
+		$extra_args = ' -q ' . $config['base_path'] . '/plugins/ciscotools/check_backup.php';
 	if( read_config_option('ciscotools_backup_running') != 'on' ) {
 		cacti_log('Start Backup', false, 'CISCOTOOLS');
 		set_config_option('ciscotools_backup_running', 'on');
@@ -585,7 +583,7 @@ function ciscotools_utilities_list () {
 			<a href='utilities.php?action=ciscotools_purge'>Remove all backup</a>
 		</td>
 		<td class="textArea">
-			Remove all backup from DB.
+			Remove ALL backup from DB.
 		</td>
 	<?php
 	form_end_row();
