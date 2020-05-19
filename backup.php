@@ -22,7 +22,7 @@
  +-------------------------------------------------------------------------+
 */
 
-include_once($config['base_path'] . '/plugins/ciscotools/ssh2.php');
+include_once($config['base_path'] . '/plugins/extenddb/ssh2.php');
 
 /* function called to do the backup of the device
 At the call we receive the ID of the device.
@@ -30,6 +30,7 @@ At the call we receive the ID of the device.
 function ciscotools_backup($deviceid) {
 	$querybackupversion = db_fetch_cell("SELECT version FROM plugin_ciscotools_backup WHERE host_id=".$deviceid." ORDER BY version DESC LIMIT 1");
 
+	$host = db_fetch_row( 'SELECT description, hostname FROM host where id='.$deviceid );
 	$stream = create_ssh($deviceid);
 	if( $stream === false ) {
 		return;
@@ -59,7 +60,7 @@ function ciscotools_backup($deviceid) {
     $ret = db_execute_prepared('INSERT INTO plugin_ciscotools_backup(host_id,version,diff,datechange) VALUES(?,?,?,?)',
     array($deviceid,$version,$data,date("Ymd")) );
     
-    cacti_log($ret?($deviceid.' config backup done'):($deviceid.' config backup error'), false, 'CISCOTOOLS');
+    cacti_log($ret?($host[description].' config backup done'):($host[description].' config backup error'), false, 'CISCOTOOLS');
 }
 
 function ciscotools_lastchange($deviceid) {
@@ -77,7 +78,7 @@ function ciscotools_lastchange($deviceid) {
 		return false;
 	}
 	
-	if(ssh_write_stream($stream, 'sh start | inc change|!Time' ) === false) return;
+	if(ssh_write_stream($stream, 'sh start | inc change|!Startup' ) === false) return;
 	$data = ssh_read_stream($stream);
 	if( $data === false ){
 		ciscotools_log( 'Erreur can\'t read version');
@@ -102,16 +103,22 @@ function purge_backup() {
 	$datetopurge = date('Ymd',strtotime(read_config_option('ciscotools_retention_duration')) );
 	cacti_log( 'Backup Purge Before: '.$datetopurge, false, 'CISCOTOOLS' );
 
-	$sqlquery = "SELECT host.description as description, plugin_ciscotools_backup.datechange as date,
-			plugin_ciscotools_backup.id as dateid
+// return the number of backup per host
+	$sqlquery = "SELECT plugin_ciscotools_backup.host_id, host.description as description,
+			plugin_ciscotools_backup.datechange as date, plugin_ciscotools_backup.id as backupid
+			count (plugin_ciscotools_backup.host_id)
 			FROM host 
 			INNER JOIN  plugin_ciscotools_backup ON plugin_ciscotools_backup.host_id=host.id
 			WHERE plugin_ciscotools_backup.datechange < '".$datetopurge."'";
-	$sqlret = db_fetch_assoc($sqlquery);
+	$sqlret = db_fetch_assoc($sqlquery); // if empty no backup
 	if($sqlret > 0 ) {
+		/* then each row contain id of host that has a backup, remove all host with backup of no more than 1
+		end delete, other until we keep only the last one
+		*/
 		foreach( $sqlret as $backup ) {
 			cacti_log('Remove Backup of : '.$backup['description'].' date: '.$datetopurge, false, 'CISCOTOOLS' );
-			db_execute( "DELETE FROM plugin_ciscotools_backup WHERE id='".$backup['dateid']."'");
+			$sqlcount = db_execute('SELECT count(*) FROM plugin_ciscotools_backup WHERE plugin_ciscotools_backup='.$backup['host_id'] );
+			db_execute( "DELETE FROM plugin_ciscotools_backup WHERE id='".$backup['backupid']."'");
 		}
 	}
 }

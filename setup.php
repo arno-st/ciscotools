@@ -24,7 +24,7 @@
 
 include_once($config['base_path'] . '/plugins/ciscotools/display_backup.php');
 include_once($config['base_path'] . '/plugins/ciscotools/backup.php');
-//include_once($config['base_path'] . '/plugins/ciscotools/upgrade.php');
+include_once($config['base_path'] . '/plugins/ciscotools/upgrade.php');
 
 function plugin_ciscotools_install () {
 	api_plugin_register_hook('ciscotools', 'config_arrays', 'ciscotools_config_arrays', 'setup.php'); // array used by this plugin
@@ -88,10 +88,62 @@ function ciscotools_check_upgrade() {
 			webpage='" . $version['homepage'] . "' 
 			WHERE directory='" . $version['name'] . "' ");
 	
-			if( $old < '1.1' ) {
-			}
-	}
+		if( $old < '1.1' ) {
+/* table to keep a queue of upgrade */
+			unset($data);
+			$data = array();
+			$data['columns'][] = array('name' => 'id', 'type' => 'mediumint(8)', 'auto_increment'=>'');
+			$data['columns'][] = array('name' => 'host_id', 'type' => 'mediumint(8)', 'NULL' => false, 'default' => '0');
+			$data['columns'][] = array('name' => 'status', 'type' => 'tinyint(1)', 'NULL' => false, 'default' => '0');
+			$data['columns'][] = array('name' => 'session', 'type' => 'smallint(1)', 'NULL' => false, 'default' => '1');
+			$data['primary'] = 'id';
+			$data['keys'][] = array('name' => 'id', 'columns' => 'id');
+			$data['keys'][] = array('name' => 'host_id', 'columns' => 'host_id');
+			$data['type'] = 'InnoDB';
+			api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_queueupgrade', $data);
 
+/* table to keep diff info for modele/version */
+			unset($data);
+			$data = array();
+			$data['columns'][] = array('name' => 'id', 'type' => 'mediumint(8)', 'auto_increment'=>'');
+			$data['columns'][] = array('name' => 'snmp_SysObjectId', 'type' => 'varchar(128)', 'NULL' => false);
+			$data['columns'][] = array('name' => 'oid_modele', 'type' => 'varchar(32)', 'NULL' => false, 'default' => '1.3.6.1.2.1.47.1.1.1.1.13');
+			$data['columns'][] = array('name' => 'modele', 'type' => 'varchar(128)', 'NULL' => true);
+			$data['columns'][] = array('name' => 'image', 'type' => 'varchar(255)', 'NULL' => false);
+			$data['columns'][] = array('name' => 'upgrade_method', 'type' => 'tinyint(1)', 'NULL' => false, 'default' => '1');
+			$data['primary'] = 'id';
+			$data['keys'][] = array('name' => 'modele', 'columns' => 'modele');
+			$data['type'] = 'InnoDB';
+			api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_modele', $data);
+		
+		/* insert values in plugin_ciscotools_modele */
+			db_execute("REPLACE INTO `plugin_ciscotools_modele` "
+				."(`snmp_SysObjectId`, `oid_modele`, `modele`, `image`, `sshCmds_version`) VALUES "
+				."('iso.3.6.1.4.1.9.1.2560', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'IR807G-LTE-GA-K9', 'ir800l-universalk9-mz.SPA.159-3.M.bin', 'dir|show version', '1'),"
+				."('iso.3.6.1.4.1.9.1.1497', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'C819G-4G-G-K9', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'dir|show version', '1'),"
+				."('iso.3.6.1.4.1.9.1.1378', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'C819G-U-K9', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'dir|show version', '1'),"
+				."('iso.3.6.1.4.1.9.1.1384', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'C819HG-U', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'dir|show version', '1'),"
+				."('iso.3.6.1.4.1.9.1.2059', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'cisco819G-4G', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'dir|show version', '1'),"
+				."('iso.3.6.1.4.1.9.1.837', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'CISCO881', 'c880data-universalk9-mz.155-3.M6.bin', 'dir|show version', '1'),"
+				."('iso.3.6.1.4.1.9.1.857', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'CISCO891-K9', 'c890-universalk9-mz.155-3.M8.bin', 'dir|show version', '1'),"
+				."('iso.3.6.1.4.1.9.1.1858', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'cisco891F', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'dir|show version', '1'),"
+				."('iso.3.6.1.4.1.9.5.18', '1.3.6.1.2.1.47.1.1.1.1.13', NULL, 'c1900-universalk9-mz.SPA.154-3.M7.bin', 'dir|show version', '1'),"
+				."('iso.3.6.1.4.1.9.1.2661', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'IR1101-K9', 'ir1101-universalk9.16.11.01.SPA.bin', 'dir|show version', '1'),"
+				."('iso.3.6.1.4.1.9.1.1041', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'CISCO3945-CHASSIS', 'c3900-universalk9-mz.SPA.155-3.M4.bin', 'dir|show version', '1'),"
+				."('iso.3.6.1.4.1.9.1.1470', '1.3.6.1.2.1.47.1.1.1.1.13.1001', 'IE-2000-4TC-G-B', 'ie2000-universalk9-tar.152-4.EA7.tar', 'dir|show version', '1'),"
+				."('iso.3.6.1.4.1.9.1.1471', '1.3.6.1.2.1.47.1.1.1.1.13.1001', 'IE-2000-4T-G-B', 'ie2000-universalk9-tar.152-4.EA7.tar', 'dir|show version', '1'),"
+				."('iso.3.6.1.4.1.9.1.1473', '1.3.6.1.2.1.47.1.1.1.1.13.1001', 'IE-2000-8TC-G-B', 'ie2000-universalk9-tar.152-4.EA7.tar', 'dir|show version', '1'),"
+				."('iso.3.6.1.4.1.9.1.1730', '1.3.6.1.2.1.47.1.1.1.1.13.1001', 'IE-2000-16PTC-G-E', 'ie2000-universalk9-tar.152-4.EA7.tar', 'dir|show version', '1'),"
+				."('iso.3.6.1.4.1.9.1.95', '1.3.6.1.2.1.47.1.1.1.1.13.1001', 'IE-3000-8TC', 'ies-lanbasek9-tar.152-4.EA8.tar', 'dir|show version', '1'),"
+				."('iso.3.6.1.4.1.9.1.1208', '1.3.6.1.2.1.47.1.1.1.1.13.1001', 'WS-C2960X-24PS-L', 'c2960x-universalk9-mz.152-6.E2.bin', 'dir|show version', '1'),"
+				."('iso.3.6.1.4.1.9.1.1208', '1.3.6.1.2.1.47.1.1.1.1.13.1001', 'WS-C2960S-24PS-L', 'c2960s-universalk9-mz.152-2.E9.bin', 'dir|show version', '1'),"
+				."('iso.3.6.1.4.1.9.1.1317', '1.3.6.1.2.1.47.1.1.1.1.13.1001', 'WS-C3560CG-8PC-S', 'c3560c405ex-universalk9-mz.152-2.E6.bin', 'dir|show version', '1'),"
+				."('iso.3.6.1.4.1.9.1.2134', '1.3.6.1.2.1.47.1.1.1.1.13.1001', 'WS-C3560CX-12PC-S', 'c3560cx-universalk9-mz.152-6.E2.bin', 'dir|show version', '1'),"
+				."('iso.3.6.1.4.1.9.1.1745', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'WS-C3850-24XS-S', 'cat3k_caa-universalk9.16.06.06.SPA.bin', 'dir|show version', '1'),"
+				."('iso.3.6.1.4.1.9.1.2694', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'C9200L-24P-4G-E', 'cat9k_lite_iosxe.16.09.05.SPA.bin', 'dir|more flash:.installer/install_add_oper.log', '2'),"
+				."('iso.3.6.1.4.1.9.1.2593', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'C9500-16X', 'cat9k_iosxe.16.09.05.SPA.bin', 'dir|more flash:.installer/install_add_oper.log', '2')");
+		}
+	}
 }
 
 function ciscotools_setup_tables() {
@@ -122,60 +174,6 @@ function ciscotools_setup_tables() {
 	$data['comment'] = 'Plugin ciscotoole - Table for diff in config change';
 	api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_backup', $data);
 
-/* table to keep a queue of upgrade */
-/*	unset($data);
-	$data = array();
-	$data['columns'][] = array('name' => 'id', 'type' => 'mediumint(8)', 'auto_increment'=>'');
-	$data['columns'][] = array('name' => 'host_id', 'type' => 'mediumint(8)', 'NULL' => false, 'default' => '0');
-	$data['columns'][] = array('name' => 'status', 'type' => 'tinyint(1)', 'NULL' => false, 'default' => '0');
-	$data['columns'][] = array('name' => 'session', 'type' => 'smallint(1)', 'NULL' => false, 'default' => '1');
-	$data['primary'] = 'id';
-	$data['keys'][] = array('name' => 'id', 'columns' => 'id');
-	$data['keys'][] = array('name' => 'host_id', 'columns' => 'host_id');
-	$data['type'] = 'InnoDB';
-	api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_queueupgrade', $data);
-*/
-/* table to keep diff info for modele/version */
-/*	unset($data);
-	$data = array();
-	$data['columns'][] = array('name' => 'id', 'type' => 'mediumint(8)', 'auto_increment'=>'');
-	$data['columns'][] = array('name' => 'snmp_SysObjectId', 'type' => 'varchar(128)', 'NULL' => false);
-	$data['columns'][] = array('name' => 'oid_modele', 'type' => 'varchar(32)', 'NULL' => false, 'default' => '1.3.6.1.2.1.47.1.1.1.1.13');
-	$data['columns'][] = array('name' => 'modele', 'type' => 'varchar(128)', 'NULL' => true);
-	$data['columns'][] = array('name' => 'image', 'type' => 'varchar(255)', 'NULL' => false);
-	$data['columns'][] = array('name' => 'upgrade_method', 'type' => 'tinyint(1)', 'NULL' => false, 'default' => '1');
-	$data['primary'] = 'id';
-	$data['keys'][] = array('name' => 'modele', 'columns' => 'modele');
-	$data['type'] = 'InnoDB';
-	api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_modele', $data);
-*/
-/* insert values in plugin_ciscotools_modele */
-/*	db_execute("REPLACE INTO `plugin_ciscotools_modele` "
-		."(`id`, `snmp_SysObjectId`, `oid_modele`, `modele`, `image`, `sshCmds_version`) VALUES "
-		."(NULL, 'iso.3.6.1.4.1.9.1.2560', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'IR807G-LTE-GA-K9', 'ir800l-universalk9-mz.SPA.159-3.M.bin', 'dir|show version', '1'),"
-		."(NULL, 'iso.3.6.1.4.1.9.1.1497', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'C819G-4G-G-K9', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'dir|show version', '1'),"
-		."(NULL, 'iso.3.6.1.4.1.9.1.1378', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'C819G-U-K9', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'dir|show version', '1'),"
-		."(NULL, 'iso.3.6.1.4.1.9.1.1384', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'C819HG-U', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'dir|show version', '1'),"
-		."(NULL, 'iso.3.6.1.4.1.9.1.2059', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'cisco819G-4G', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'dir|show version', '1'),"
-		."(NULL, 'iso.3.6.1.4.1.9.1.837', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'CISCO881', 'c880data-universalk9-mz.155-3.M6.bin', 'dir|show version', '1'),"
-		."(NULL, 'iso.3.6.1.4.1.9.1.857', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'CISCO891-K9', 'c890-universalk9-mz.155-3.M8.bin', 'dir|show version', '1'),"
-		."(NULL, 'iso.3.6.1.4.1.9.1.1858', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'cisco891F', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'dir|show version', '1'),"
-		."(NULL, 'iso.3.6.1.4.1.9.5.18', '1.3.6.1.2.1.47.1.1.1.1.13', NULL, 'c1900-universalk9-mz.SPA.154-3.M7.bin', 'dir|show version', '1'),"
-		."(NULL, 'iso.3.6.1.4.1.9.1.2661', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'IR1101-K9', 'ir1101-universalk9.16.11.01.SPA.bin', 'dir|show version', '1'),"
-		."(NULL, 'iso.3.6.1.4.1.9.1.1041', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'CISCO3945-CHASSIS', 'c3900-universalk9-mz.SPA.155-3.M4.bin', 'dir|show version', '1'),"
-		."(NULL, 'iso.3.6.1.4.1.9.1.1470', '1.3.6.1.2.1.47.1.1.1.1.13.1001', 'IE-2000-4TC-G-B', 'ie2000-universalk9-tar.152-4.EA7.tar', 'dir|show version', '1'),"
-		."(NULL, 'iso.3.6.1.4.1.9.1.1471', '1.3.6.1.2.1.47.1.1.1.1.13.1001', 'IE-2000-4T-G-B', 'ie2000-universalk9-tar.152-4.EA7.tar', 'dir|show version', '1'),"
-		."(NULL, 'iso.3.6.1.4.1.9.1.1473', '1.3.6.1.2.1.47.1.1.1.1.13.1001', 'IE-2000-8TC-G-B', 'ie2000-universalk9-tar.152-4.EA7.tar', 'dir|show version', '1'),"
-		."(NULL, 'iso.3.6.1.4.1.9.1.1730', '1.3.6.1.2.1.47.1.1.1.1.13.1001', 'IE-2000-16PTC-G-E', 'ie2000-universalk9-tar.152-4.EA7.tar', 'dir|show version', '1'),"
-		."(NULL, 'iso.3.6.1.4.1.9.1.95', '1.3.6.1.2.1.47.1.1.1.1.13.1001', 'IE-3000-8TC', 'ies-lanbasek9-tar.152-4.EA8.tar', 'dir|show version', '1'),"
-		."(NULL, 'iso.3.6.1.4.1.9.1.1208', '1.3.6.1.2.1.47.1.1.1.1.13.1001', 'WS-C2960X-24PS-L', 'c2960x-universalk9-mz.152-6.E2.bin', 'dir|show version', '1'),"
-		."(NULL, 'iso.3.6.1.4.1.9.1.1208', '1.3.6.1.2.1.47.1.1.1.1.13.1001', 'WS-C2960S-24PS-L', 'c2960s-universalk9-mz.152-2.E9.bin', 'dir|show version', '1'),"
-		."(NULL, 'iso.3.6.1.4.1.9.1.1317', '1.3.6.1.2.1.47.1.1.1.1.13.1001', 'WS-C3560CG-8PC-S', 'c3560c405ex-universalk9-mz.152-2.E6.bin', 'dir|show version', '1'),"
-		."(NULL, 'iso.3.6.1.4.1.9.1.2134', '1.3.6.1.2.1.47.1.1.1.1.13.1001', 'WS-C3560CX-12PC-S', 'c3560cx-universalk9-mz.152-6.E2.bin', 'dir|show version', '1'),"
-		."(NULL, 'iso.3.6.1.4.1.9.1.1745', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'WS-C3850-24XS-S', 'cat3k_caa-universalk9.16.06.06.SPA.bin', 'dir|show version', '1'),"
-		."(NULL, 'iso.3.6.1.4.1.9.1.2694', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'C9200L-24P-4G-E', 'cat9k_lite_iosxe.16.09.05.SPA.bin', 'dir|more flash:.installer/install_add_oper.log', '2'),"
-		."(NULL, 'iso.3.6.1.4.1.9.1.2593', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'C9500-16X', 'cat9k_iosxe.16.09.05.SPA.bin', 'dir|more flash:.installer/install_add_oper.log', '2')");
-*/
 }
 
 function plugin_ciscotools_version () {

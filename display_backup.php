@@ -21,7 +21,7 @@
  | http://www.cacti.net/                                                   |
  +-------------------------------------------------------------------------+
 */
-include_once($config['base_path'] . '/plugins/ciscotools/ssh2.php');
+include_once($config['base_path'] . '/plugins/extenddb/ssh2.php');
 include_once($config['base_path'] . '/plugins/ciscotools/class.Diff.php');
 
 function ciscotools_displaybackup() {
