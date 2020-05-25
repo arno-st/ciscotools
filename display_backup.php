@@ -25,7 +25,7 @@ include_once($config['base_path'] . '/plugins/extenddb/ssh2.php');
 include_once($config['base_path'] . '/plugins/ciscotools/class.Diff.php');
 
 function ciscotools_displaybackup() {
-    global $config;
+    global $config, $item_rows;
 	/* ================= input validation ================= */
 	input_validate_input_number(get_request_var("page"));
 	input_validate_input_number(get_request_var("rows"));
@@ -99,6 +99,7 @@ function ciscotools_displaybackup() {
 	
 	function applyFilterChange(objForm) {
 		strURL = '?header=false&description=' + objForm.description.value;
+		strURL += '&rows=' + objForm.rows.value;
 		document.location = strURL;
 	}
 	function clearFilter() {
@@ -135,6 +136,21 @@ function ciscotools_displaybackup() {
 					<td width="1">
 						<input type="text" name="description" size="25" value="<?php print get_request_var_request("description");?>">
 					</td>
+				<td nowrap style='white-space: nowrap;' width="1">
+					&nbsp;Rows:&nbsp;
+				</td>
+				<td width="1">
+					<select name="rows" onChange="applyFilterChange(document.form)">
+						<option value="-1"<?php if (get_request_var("rows") == "-1") {?> selected<?php }?>>Default</option>
+						<?php
+						if (sizeof($item_rows) > 0) {
+							foreach ($item_rows as $key => $value) {
+								print "<option value='" . $key . "'"; if (get_request_var("rows") == $key) { print " selected"; } print ">" . $value . "</option>\n";
+							}
+						}
+						?>
+					</select>
+				</td>
 					<td nowrap style='white-space: nowrap;'>
 						<input type="submit" value="Go" title="Set/Refresh Filters">
 						<input type='button' value="Clear" id='clear' onClick='clearFilter()' title="Reset fields to defaults">

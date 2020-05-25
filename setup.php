@@ -459,8 +459,8 @@ function ciscotools_device_action_prepare($save) {
 
         $action = $save['drp_action'];
 
-        if ($action != 'ciscotools_upgrade' && $action != 'ciscotools_backup') {
-                return $save;
+        if ($action != 'ciscotools_upgrade' || $action != 'ciscotools_backup') {
+			return $save;
         }
 
         if ($action == 'ciscotools_upgrade') {
@@ -474,7 +474,8 @@ function ciscotools_device_action_prepare($save) {
 				<p>" . __('Click \'Continue\' to %s on these Device(s)', $action_description) . "</p>
 				<p><div class='itemlist'><ul>" . $save['host_list'] . "</ul></div></p>
 			</td>
-		</tr>";  
+		</tr>"; 
+	return $save;
 }
 
 function ciscotools_poller_bottom () {
