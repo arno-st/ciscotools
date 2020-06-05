@@ -30,21 +30,35 @@ At the call we receive the ID of the device.
 function ciscotools_backup($deviceid) {
 	$querybackupversion = db_fetch_cell("SELECT version FROM plugin_ciscotools_backup WHERE host_id=".$deviceid." ORDER BY version DESC LIMIT 1");
 
-	$host = db_fetch_row( 'SELECT description, hostname FROM host where id='.$deviceid );
-	$stream = create_ssh($deviceid);
+	$host = db_fetch_row( 'SELECT description, hostname, console_type  FROM host where id='.$deviceid );
+	if ( $host['console_type'] == 1 ) {
+		$stream = create_ssh($deviceid);
+	} else {
+		$stream = create_telnet($deviceid);
+	}
 	if( $stream === false ) {
 		return;
 	}
 
-	if(ssh_write_stream($stream, 'term length 0' ) === false) return;
-	$data = ssh_read_stream($stream);
+	if ( $host['console_type'] == 1 ) {
+		if(ssh_write_stream($stream, 'term length 0' ) === false) return;
+		$data = ssh_read_stream($stream);
+	} else {
+		if(telnet_write_stream($stream, 'term length 0' ) === false) return;
+		$data = telnet_read_stream($stream);
+	}
 	if( $data === false ){
 		ciscotools_log( 'Erreur can\'t read term length 0');
 		return;
 	}
 	
-	if ( ssh_write_stream($stream, 'sh start') === false ) return;
-	$data = ssh_read_stream($stream);
+	if ( $host['console_type'] == 1 ) {
+		if ( ssh_write_stream($stream, 'sh start') === false ) return;
+		$data = ssh_read_stream($stream);
+	} else {
+		if ( telnet_write_stream($stream, 'sh start') === false ) return;
+		$data = telnet_read_stream($stream);
+	}
 	if( $data === false ){
 		ciscotools_log( 'Erreur can\'t read sh start');
 		return;
@@ -68,18 +82,28 @@ function ciscotools_lastchange($deviceid) {
     sh start | inc configuration change            D   M   d y
     ! Last configuration change at 12:28:03 LSN Wed Apr 8 2020 by a_soi_0518
     */
-    $dbquery = db_fetch_row_prepared("SELECT description, hostname FROM host WHERE id=?", array($deviceid));
-    if( $dbquery === false ){
+    $host = db_fetch_row_prepared("SELECT description, hostname, console_type FROM host WHERE id=?", array($deviceid));
+    if( $host === false ){
         return false; // no host to backup
     }
 
-	$stream = create_ssh($deviceid);
+	if ( $host['console_type'] == 1 ) {
+		$stream = create_ssh($deviceid);
+	} else {
+		$stream = create_telnet($deviceid);
+	}
 	if($stream === false){
 		return false;
 	}
 	
-	if(ssh_write_stream($stream, 'sh start | inc change|!Startup' ) === false) return;
-	$data = ssh_read_stream($stream);
+	if ( $host['console_type'] == 1 ) {
+		if(ssh_write_stream($stream, 'sh start | inc change|!Startup' ) === false) return;
+			$data = ssh_read_stream($stream);
+	} else {
+		if(telnet_write_stream($stream, 'sh start | inc change|!Startup' ) === false) return;
+			$data = telnet_read_stream($stream);
+	}
+
 	if( $data === false ){
 		ciscotools_log( 'Erreur can\'t read version');
 		return false;

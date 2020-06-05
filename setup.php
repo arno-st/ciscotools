@@ -25,6 +25,7 @@
 include_once($config['base_path'] . '/plugins/ciscotools/display_backup.php');
 include_once($config['base_path'] . '/plugins/ciscotools/backup.php');
 include_once($config['base_path'] . '/plugins/ciscotools/upgrade.php');
+include_once($config['base_path'] . '/plugins/ciscotools/mactrack.php');
 
 function plugin_ciscotools_install () {
 	api_plugin_register_hook('ciscotools', 'config_arrays', 'ciscotools_config_arrays', 'setup.php'); // array used by this plugin
@@ -143,6 +144,23 @@ function ciscotools_check_upgrade() {
 				."('iso.3.6.1.4.1.9.1.2694', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'C9200L-24P-4G-E', 'cat9k_lite_iosxe.16.09.05.SPA.bin', 'dir|more flash:.installer/install_add_oper.log', '2'),"
 				."('iso.3.6.1.4.1.9.1.2593', '1.3.6.1.2.1.47.1.1.1.1.13.1', 'C9500-16X', 'cat9k_iosxe.16.09.05.SPA.bin', 'dir|more flash:.installer/install_add_oper.log', '2')");
 		}
+		if( $old < '1.2' ) {
+/* table to keep MAC information */
+			$data = array();
+			$data['columns'][] = array('name' => 'id', 'type' => 'mediumint(8)', 'auto_increment'=>'');
+			$data['columns'][] = array('name' => 'host_id', 'type' => 'mediumint(8)', 'NULL' => false, 'default' => '0');
+			$data['columns'][] = array('name' => 'mac_address', 'type' => 'varchar(12)', 'NULL' => false, 'default' => '0');
+			$data['columns'][] = array('name' => 'port', 'type' => 'varchar()', 'NULL' => false);
+		    $data['columns'][] = array('name' => 'vlan', 'type' => 'mediumint(4)', 'NULL' => false);
+			$data['primary'] = 'id';
+			$data['keys'][] = array('name' => 'id', 'columns' => 'id');
+			$data['keys'][] = array('name' => 'host_id', 'columns' => 'host_id');
+			$data['keys'][] = array('name' => 'mac_address', 'columns' => 'mac_address');
+			$data['keys'][] = array('name' => 'vlan', 'columns' => 'vlan');
+			$data['type'] = 'InnoDB';
+			$data['comment'] = 'Plugin ciscotoole - Table for MacTrack information';
+			api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_backup', $data);
+		}
 	}
 }
 
@@ -173,7 +191,6 @@ function ciscotools_setup_tables() {
 	$data['type'] = 'InnoDB';
 	$data['comment'] = 'Plugin ciscotoole - Table for diff in config change';
 	api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_backup', $data);
-
 }
 
 function plugin_ciscotools_version () {
