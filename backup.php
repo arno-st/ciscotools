@@ -31,7 +31,13 @@ function ciscotools_backup($deviceid) {
 	$querybackupversion = db_fetch_cell("SELECT version FROM plugin_ciscotools_backup WHERE host_id=".$deviceid." ORDER BY version DESC LIMIT 1");
 
 	$host = db_fetch_row( 'SELECT description, hostname, console_type  FROM host where id='.$deviceid );
-	if ( $host['console_type'] == 1 ) {
+	if(empty($host['console_type'])) {
+        $console_type = read_config_option('ciscotools_default_console_type');
+    } else {
+        $console_type = $host['console_type'];
+    }
+ 
+	if ( $console_type == 1 ) {
 		$stream = create_ssh($deviceid);
 	} else {
 		$stream = create_telnet($deviceid);
@@ -40,7 +46,7 @@ function ciscotools_backup($deviceid) {
 		return;
 	}
 
-	if ( $host['console_type'] == 1 ) {
+	if ( $console_type == 1 ) {
 		if(ssh_write_stream($stream, 'term length 0' ) === false) return;
 		$data = ssh_read_stream($stream);
 	} else {
@@ -52,7 +58,7 @@ function ciscotools_backup($deviceid) {
 		return;
 	}
 	
-	if ( $host['console_type'] == 1 ) {
+	if ( $console_type == 1 ) {
 		if ( ssh_write_stream($stream, 'sh start') === false ) return;
 		$data = ssh_read_stream($stream);
 	} else {
@@ -74,7 +80,7 @@ function ciscotools_backup($deviceid) {
     $ret = db_execute_prepared('INSERT INTO plugin_ciscotools_backup(host_id,version,diff,datechange) VALUES(?,?,?,?)',
     array($deviceid,$version,$data,date("Ymd")) );
     
-    cacti_log($ret?($host['description'].' config backup done'):($host['description'].' config backup error'), false, 'CISCOTOOLS');
+    cacti_log($ret?($host['description'].' config backup done '.$console_type):($host['description'].' config backup error '.$console_type), false, 'CISCOTOOLS');
 }
 
 function ciscotools_lastchange($deviceid) {
