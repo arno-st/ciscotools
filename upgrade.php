@@ -624,7 +624,7 @@ function checkTFTP($deviceID, $deviceHostname, $tftpAddress)
 * @param int $deviceID the ID of the device in the queue table references to the table host
 * @param string $deviceHostname the name of the device useful for the logs
 * @param string $deviceIP the IP of the device
-* @param array $snmpInfos the SNMP informations of the device (community, login, ...)
+* @param array $snmpInfos the SNMP informations of the device (community, login...)
 * @param string $tftpAddress the TFTP server address
 * @param string $fileName the filename of the new image
 * @return bool true if successful, false otherwise
@@ -799,14 +799,12 @@ function upgradeStepTwo($deviceID, $deviceSession)
 * +-----------------------------+
 * | 2.1. UPLOAD STATUS CHECKING |
 * +-----------------------------+
-* 
-*
 * Perform the upload of the new image with a SNMP method with ciscoFlashCopy
 *
 * @param int $deviceID the ID of the device in the queue table references to the table host
 * @param string $deviceIP the IP of the device
 * @param string $deviceHostname the name of the device useful for the logs
-* @param array $snmpInfos the SNMP informations of the device (community, login, ...)
+* @param array $snmpInfos the SNMP informations of the device (community, login...)
 * @return string|bool true if successful, 'progress' if in progress, false otherwise
 */
 function checkUploadStatus($deviceID, $deviceIP, $deviceHostname, $snmpInfos)
@@ -865,6 +863,12 @@ function checkUploadStatus($deviceID, $deviceIP, $deviceHostname, $snmpInfos)
 * +--------------------+
 * | 2.2 IMAGES ERASING |
 * +--------------------+
+* Perform a deletion of the old installed images.
+*
+* @param array $infosDevice the array with all the informations about the device
+* @param array $credentials the array with all the informations about credentials
+* @param string $fileName the filename of the new image
+* @return bool true if successful, false otherwise
 */
 function deleteImages($infosDevice, $credentials, $fileName)
 {
@@ -894,6 +898,13 @@ function deleteImages($infosDevice, $credentials, $fileName)
 * +---------------+
 * | 3. STEP THREE |
 * +---------------+
+* Check if device is rebooted and new image installation
+*
+* Ping the rebooted device, return false if down and check the new image installation
+* if the device is up.
+*
+* @param int $deviceID the ID of the device in the queue table references to the table host
+* @return bool true if successful, false otherwise
 */
 function upgradeStepThree($deviceID)
 {
@@ -975,6 +986,13 @@ function upgradeStepThree($deviceID)
 * +--------------------+
 * | 3.1 IMAGE CHECKING |
 * +--------------------+
+* Check if the new image is correctly installed with a SNMP request
+*
+* @param int $deviceID the ID of the device in the queue table references to the table host
+* @param string $deviceHostname the name of the device useful for the logs
+* @param array $snmpInfos the SNMP informations of the device (community, login...)
+* @param string $fileName the filename of the new image
+* @return bool true if successful, false otherwise
 */
 function imageChecking($deviceID, $deviceHostname, $snmpInfos, $fileName)
 {
@@ -1030,6 +1048,16 @@ function cmdSSH($deviceIP, $username, $password, $cmd)
 * +---------------------+
 * | 4.2 SNMPSET UPGRADE |
 * +---------------------+
+* Simplified function for snmpset through shell_exec command
+* Choose between the SNMPv2c and SNMPv3
+*
+* @param string $snmpVersion version of SNMP (v2c or v3)
+* @param string $deviceIP the IP of the device 
+* @param string $oid chosen OID
+* @param string $snmpDataType type of data like int, string...
+* @param string $snmpData new value to set
+* @param array $snmpInfos the SNMP informations of the device (community, login...)
+* @return null
 */
 function snmpUpgSet($snmpVersion, $deviceIP, $oid, $snmpDataType, $snmpData, $snmpInfos) 
 {
@@ -1067,6 +1095,15 @@ function snmpUpgSet($snmpVersion, $deviceIP, $oid, $snmpDataType, $snmpData, $sn
 * +----------------------+
 * | 4.3 SNMPWALK UPGRADE |
 * +----------------------+
+* Simplified function for snmpwalk through shell_exec command
+* Choose between the SNMPv2c and SNMPv3
+*
+* @param string $snmpVersion version of SNMP (v2c or v3)
+* @param string $snmpCommunity SNMP reading community
+* @param string $deviceIP the IP of the device 
+* @param string $oid chosen OID
+* @param array $snmpInfos the SNMP informations of the device (community, login...)
+* @return bool|string $snmpExec if successful, false otherwise
 */
 function snmpUpgWalk($snmpVersion, $snmpCommunity, $deviceIP, $oid, $snmpInfos) 
 {
@@ -1107,6 +1144,15 @@ function snmpUpgWalk($snmpVersion, $snmpCommunity, $deviceIP, $oid, $snmpInfos)
 * +------------------------+
 * | 4.4 SNMP INFOS GETTING |
 * +------------------------+
+* Get and check all SNMP informations
+*
+* Tansform the SNMP version (int) into a string (2="2c" and 3="3")
+* Create an array with all SNMP informations
+* If no session number generated, create one
+*
+* @param array $infosDevice the array with all the informations about the device
+* @param string $deviceHostname the name of the device useful for the logs
+* @return array|bool $snmpInfos if successful, false otherwise
 */
 function getSnmpInfos($infosDevice, $deviceHostname)
 {
@@ -1163,6 +1209,11 @@ function getSnmpInfos($infosDevice, $deviceHostname)
 * +--------------------+
 * | 4.5 QUEUE DELETING |
 * +--------------------+
+* Delete the device of the upgrade queue
+*
+* @param int $deviceID the ID of the device in the queue table references to the table host
+* @param string $deviceHostname the name of the device useful for the logs
+* @return bool true if successful, false otherwise
 */
 function queueDeleting($deviceID, $deviceHostname) 
 {
@@ -1179,15 +1230,6 @@ function queueDeleting($deviceID, $deviceHostname)
         ciscotools_log("[ERROR] Upgrade: impossible to delete " . $deviceHostname . " from queue!");
         return false;
     }
-}
-
-
-/**
-* 2.14 USER NOTIFICATION
-*/
-function userNotification()
-{
-    return true;
 }
 
 /*

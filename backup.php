@@ -93,7 +93,13 @@ function ciscotools_lastchange($deviceid) {
         return false; // no host to backup
     }
 
-	if ( $host['console_type'] == 1 ) {
+	if(empty($host['console_type'])) {
+        $console_type = read_config_option('ciscotools_default_console_type');
+    } else {
+        $console_type = $host['console_type'];
+    }
+ 
+	if ( $console_type == 1 ) {
 		$stream = create_ssh($deviceid);
 	} else {
 		$stream = create_telnet($deviceid);
@@ -102,7 +108,7 @@ function ciscotools_lastchange($deviceid) {
 		return false;
 	}
 	
-	if ( $host['console_type'] == 1 ) {
+	if ( $console_type == 1 ) {
 		if(ssh_write_stream($stream, 'sh start | inc change|!Startup' ) === false) return;
 			$data = ssh_read_stream($stream);
 	} else {

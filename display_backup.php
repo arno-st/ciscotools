@@ -73,9 +73,9 @@ function ciscotools_displaybackup() {
 			LIMIT " . $sql_limit;
 	
 	$result = db_fetch_assoc($sql_query); // query result is one entry par backup
+	ciscotools_log('query host: '. $sql_query );
 	// get last date, and count how many backup per 1 host, can't do in the sql query
 	$devices = array();
-	$i = 0;
 	foreach( $result as $entry ) {
 		$id = $entry['id'];
 		if (isset($devices[$id]) ) { 
@@ -90,8 +90,11 @@ function ciscotools_displaybackup() {
 			$devices[$id]['date'] = $entry['date'];
 			$devices[$id]['count'] = 1;
 		}
-		$i++;
+	ciscotools_log('Devices: '. $devices[$id]['description'] .' count: '.$devices[$id]['count'] ); // display number of backup
 	}
+	ciscotools_log('Nb Devices: '. count($devices) ); // actual number of device into $devices to display
+// $result count the number of backups, devices give the number of backups per hosts, but resulting of the sql_limit (50 backup, but on 17 hosts)
+// make a do while until count($devices) equal $per_row
 	?>
 	
 	<script type="text/javascript">
@@ -180,10 +183,10 @@ function ciscotools_displaybackup() {
 	
 	html_header_sort($display_text, '', '', false);
 
-	$i=0;
 	if (!empty($devices)) {
 			$class   = 'odd';
-			foreach($devices as $row) {
+			// $page contain the start value, $row the number to display
+		foreach($devices as $row) {
 					($class == 'odd' )?$class='even':$class='odd';
 					$type_string = ($row['count']>1)?'>DIFF':'>Backup';
 					print"<tr class='$class'>";
