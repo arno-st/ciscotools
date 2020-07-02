@@ -56,11 +56,17 @@ switch(get_request_var('action')) {
 		bottom_footer();
 		break;
 
-	case 'backup': // same for both action
-	default:
+	case 'backup': 
 		general_header();
 		ciscotools_tabs();
 		ciscotools_displaybackup();
+		bottom_footer();
+		break;
+		
+	case 'display_mac': // Display the mac adress table
+		general_header();
+		ciscotools_tabs();
+		ciscotools_displaymac();
 		bottom_footer();
 		break;
 }
@@ -70,9 +76,10 @@ function ciscotools_tabs() {
 
 	/* present a tabbed interface */
 	$tabs = array(
-		'backup'    => __('Backup', 'ciscotools'),
-		'diff'      => __('Diff', 'ciscotools'),
-		'output'      => __('Output', 'ciscotools')
+		'backup'    	=> __('Backup', 'ciscotools'),
+		'diff'      	=> __('Diff', 'ciscotools'),
+		'output'		=> __('Backup Output', 'ciscotools'),
+		'display_mac'	=> __('Display Mac', 'ciscotools')
 	);
 
 	get_filter_request_var('tab', FILTER_VALIDATE_REGEXP, array('options' => array('regexp' => '/^([a-zA-Z]+)$/')));
@@ -95,34 +102,5 @@ function ciscotools_tabs() {
 
 	print "</ul></nav></div>\n";
 }
-
-html_start_box(__('Cisco Tools', 'ciscotools'), '100%', '', '3', 'center', 'ciscotools_tab.php');
-?>
-
-<meta charset="utf-8"/>
-	<td class="noprint">
-	<form style="padding:0px;margin:0px;" name="form" method="get" action="<?php print $config['url_path'];?>plugins/ciscotools/ciscotools_map.php">
-		<table width="100%" cellpadding="0" cellspacing="0">
-			<tr class="noprint">
-				<td nowrap style='white-space: nowrap;' width="1">
-					&nbsp;Description :&nbsp;
-				</td>
-				<td width="1">
-					<input type="text" name="description" size="25" value="<?php print get_request_var_request("description");?>">
-				</td>
-				<td nowrap style='white-space: nowrap;'>
-					<input type="submit" value="Go" title="Set/Refresh Filters">
-					<input type='button' value="Clear" id='clear' onClick='clearFilter()' title="Reset fields to defaults">
-				</td>
-			</tr>
-		</table>
-	</form>
-	</td>
-</tr>
-
-<?php
-
-html_end_box(false);
-
 
 ?>

@@ -30,7 +30,7 @@ function ciscotools_displaybackup() {
 	input_validate_input_number(get_request_var("page"));
 	input_validate_input_number(get_request_var("rows"));
 	/* ==================================================== */
-	// clean up descrption
+	// clean up description
 	if (isset_request_var('description') ) {
 		set_request_var('description', sanitize_search_string(get_request_var("description")) );
 	}
@@ -73,7 +73,7 @@ function ciscotools_displaybackup() {
 			LIMIT " . $sql_limit;
 	
 	$result = db_fetch_assoc($sql_query); // query result is one entry par backup
-	ciscotools_log('query host: '. $sql_query );
+
 	// get last date, and count how many backup per 1 host, can't do in the sql query
 	$devices = array();
 	foreach( $result as $entry ) {
@@ -90,9 +90,7 @@ function ciscotools_displaybackup() {
 			$devices[$id]['date'] = $entry['date'];
 			$devices[$id]['count'] = 1;
 		}
-	ciscotools_log('Devices: '. $devices[$id]['description'] .' count: '.$devices[$id]['count'] ); // display number of backup
 	}
-	ciscotools_log('Nb Devices: '. count($devices) ); // actual number of device into $devices to display
 // $result count the number of backups, devices give the number of backups per hosts, but resulting of the sql_limit (50 backup, but on 17 hosts)
 // make a do while until count($devices) equal $per_row
 	?>
@@ -101,7 +99,8 @@ function ciscotools_displaybackup() {
 	<!--
 	
 	function applyFilterChange(objForm) {
-		strURL = '?header=false&description=' + objForm.description.value;
+		strURL = '?header=false&action=backup'
+		streURL += '&description=' + objForm.description.value;
 		strURL += '&rows=' + objForm.rows.value;
 		document.location = strURL;
 	}
@@ -116,7 +115,7 @@ function ciscotools_displaybackup() {
 			unset($_REQUEST["description"]);
 			
 		?>
-		strURL  = 'ciscotools_tab.php?header=false';
+		strURL  = 'ciscotools_tab.php?action=backup&header=false';
 		loadPageNoHeader(strURL);
 	}
 	
@@ -160,6 +159,7 @@ function ciscotools_displaybackup() {
 					</td>
 				</tr>
 			</table>
+			<input type='hidden' name='action' value='backup'>
 		</form>
 		</td>
 	</tr>

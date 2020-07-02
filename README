@@ -29,3 +29,4 @@
 
 1.0.0 Add 3 fields: login, password, console type (ssh, telnet), and manage to do a backup of the switch via the console port
 1.1.0 Added the functionality of doing an upgrade of the switch, and the upload of new IOS based a snmpSysObjId via tftp or snmp
+1.2.0 Added the MacTrack function
