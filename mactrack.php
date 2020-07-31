@@ -23,7 +23,7 @@
 */
 
 include_once($config['base_path'] . '/plugins/extenddb/ssh2.php');
-$snmp_bridge = "1.3.6.1.2.1.17.4.4";
+$snmp_bridge = "1.3.6.1.2.1.17.4.4"; // where you can find info on mac table
 
 function ciscotools_displaymac() {
     global $config, $item_rows;

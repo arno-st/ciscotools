@@ -117,6 +117,7 @@ function ciscotools_check_upgrade() {
 			api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_image', $data);
 		
 			/* insert values in plugin_ciscotools_image */
+			db_execute("TRUNCATE plugin_ciscotools_image");
 			db_execute("INSERT INTO plugin_ciscotools_image 
 				(`model`, `image`, `mode`) VALUES 
 				('IR807-LTE-GA-K9', 'ir800l-universalk9-mz.SPA.159-3.M.bin', 'bundle'),
@@ -296,13 +297,6 @@ function ciscotools_config_form () {
 				'value' => '|arg1:do_backup|',
 				'default' => read_config_option('ciscotools_default_do_backup'),
 			);
-			$fields_host_edit3['keep_mac_track'] = array(
-				'friendly_name' => 'Do we keep the mac list',
-				'description' => 'Enable if we need to keep the mac information on mactrack table.',
-				'method' => 'checkbox',
-				'value' => '|arg1:keep_mac_track|',
-				'default' => read_config_option('ciscotools_default_keep_mac_track'),
-			);
 		}
 	}
 	$fields_host_edit = $fields_host_edit3;
@@ -421,47 +415,40 @@ function ciscotools_api_device_new($hostrecord_array) {
 		return $hostrecord_array;
 	}
 
-	if (isset_request_var('login')) {
-		$hostrecord_array['login'] = form_input_validate(get_filter_request_var('login'), 'login', '', true, 3);
+	if (isset($_POST['login'])) {
+		$hostrecord_array['login'] = form_input_validate($_POST['login'], 'login', '', true, 3);
 	} else {
 		$hostrecord_array['login'] = form_input_validate('', 'login', '', true, 3);
 	}
 	
-	if (isset_request_var('password')) {
-		$hostrecord_array['password'] = form_input_validate(get_filter_request_var('password'), 'password', '', true, 3);
+	if (isset($_POST['password'])) {
+		$hostrecord_array['password'] = form_input_validate($_POST['password'], 'password', '', true, 3);
 	} else {
 		$hostrecord_array['password'] = form_input_validate('', 'password', '', true, 3);
 	}
 	
-	if (isset_request_var('console_type')) {
-		$hostrecord_array['console_type'] = form_input_validate(get_filter_request_var('console_type'), 'console_type', '', true, 3);
+	if (isset($_POST['console_type'])) {
+		$hostrecord_array['console_type'] = form_input_validate($_POST['console_type'], 'console_type', '', true, 3);
 	} else {
 		$hostrecord_array['console_type'] = form_input_validate('', 'console_type', '', true, 3);
 	}
 // following change is present only if ON
-	if (isset_request_var('can_be_upgraded')) {
-		$hostrecord_array['can_be_upgraded'] = form_input_validate(get_filter_request_var('can_be_upgraded'), 'can_be_upgraded', '', true, 3);
+	if (isset($_POST['can_be_upgraded'])) {
+		$hostrecord_array['can_be_upgraded'] = form_input_validate($_POST['can_be_upgraded'], 'can_be_upgraded', '', true, 3);
 	} else {
 		$hostrecord_array['can_be_upgraded'] = form_input_validate('off', 'can_be_upgraded', '', true, 3);
 	}
 	
-	if (isset_request_var('can_be_rebooted')) {
-		$hostrecord_array['can_be_rebooted'] = form_input_validate(get_filter_request_var('can_be_rebooted'), 'can_be_rebooted', '', true, 3);
+	if (isset($_POST['can_be_rebooted'])) {
+		$hostrecord_array['can_be_rebooted'] = form_input_validate($_POST['can_be_rebooted'], 'can_be_rebooted', '', true, 3);
 	} else {
 		$hostrecord_array['can_be_rebooted'] = form_input_validate('off', 'can_be_rebooted', '', true, 3);
 	}
 
-	if (isset_request_var('do_backup')) {
-		$hostrecord_array['do_backup'] = form_input_validate(get_filter_request_var('do_backup'), 'do_backup', '', true, 3);
+	if (isset($_POST['do_backup'])) {
+		$hostrecord_array['do_backup'] = form_input_validate($_POST['do_backup'], 'do_backup', '', true, 3);
 	} else {
 		$hostrecord_array['do_backup'] = form_input_validate('off', 'do_backup', '', true, 3);
-	}
-	
-	if (isset_request_var('keep_mac_track')) {
-		$hostrecord_array['keep_mac_track'] = form_input_validate(get_filter_request_var('keep_mac_track'), 'keep_mac_track', '', true, 3);
-		get_mac_table($hostrecord_array);
-	} else {
-		$hostrecord_array['keep_mac_track'] = form_input_validate('', 'keep_mac_track', '', true, 3);
 	}
 
 	sql_save($hostrecord_array, 'host');
@@ -537,9 +524,10 @@ function ciscotools_poller_bottom () {
 	else {
 		$upgradeCmdString = trim(read_config_option('path_php_binary'));
 		// If its not set, just assume its in the path
+		set_config_option('ciscotools_upgrade_running', 'off'); // Bug with set_config_option
 		if (trim($upgradeCmdString) == '')
 			$upgradeCmdString = 'php';
-			$upgradeExtrArgs = ' -q ' . $config['base_path'] . '/plugins/ciscotools/upgrade_start.php';
+			$upgradeExtrArgs = ' -q ' . $config['base_path'] . '/plugins/ciscotools/upgrade/upgrade_start.php';
 		if(read_config_option('ciscotools_upgrade_running') != 'on' ) {
 			cacti_log('Start Upgrade', false, 'CISCOTOOLS');
 			set_config_option('ciscotools_upgrade_running', 'on');
@@ -640,7 +628,7 @@ function ciscotools_utilities_list () {
 	form_alternate_row();
 	?>
 		<td class="textArea">
-			<a href="<?php print $config['url_path'] . 'plugins/ciscotools/'; ?>display_image.php?action=display_image">Edit the Ciscotools image table</a>
+			<a href="<?php print $config['url_path'] . 'plugins/ciscotools/upgrade'; ?>display_image.php?action=display_image">Edit the Ciscotools image table</a>
 		</td>
 		<td class="textArea">
 			Change, add or remove an image entry on the Ciscotools Image table.

@@ -69,6 +69,13 @@ switch(get_request_var('action')) {
 		ciscotools_displaymac();
 		bottom_footer();
 		break;
+
+	case 'upgrade':
+		general_header();
+		ciscotools_tabs();
+		ciscotools_displayupgrade();
+		bottom_footer();
+		break;
 }
 
 function ciscotools_tabs() {
@@ -79,7 +86,8 @@ function ciscotools_tabs() {
 		'backup'    	=> __('Backup', 'ciscotools'),
 		'diff'      	=> __('Diff', 'ciscotools'),
 		'output'		=> __('Backup Output', 'ciscotools'),
-		'display_mac'	=> __('Display Mac', 'ciscotools')
+		'display_mac'	=> __('Display Mac', 'ciscotools'),
+		'upgrade'		=> __('Upgrade', 'ciscotools')
 	);
 
 	get_filter_request_var('tab', FILTER_VALIDATE_REGEXP, array('options' => array('regexp' => '/^([a-zA-Z]+)$/')));
