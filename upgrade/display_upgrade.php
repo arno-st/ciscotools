@@ -496,7 +496,7 @@ function ciscotools_displayUpgrade()
     html_start_box("", "100%", "", "3", "center", "");
 
     $displayDeviceText = ($totalRows>1) ? "Devices" : "Device";	// One or more > plural form
-    $nav = html_nav_bar("ciscotools_tab.php", MAX_DISPLAY_PAGES, get_request_var("page"), $perRow, $totalRows, 12, __($displayDeviceText), "page", "main");
+    $nav = html_nav_bar("ciscotools_tab.php?action=upgrade", MAX_DISPLAY_PAGES, get_request_var("page"), $perRow, $totalRows, 12, __($displayDeviceText), "page", "main");
     echo $nav;
 
 	// Put checkboxes and redirect on upgrade tab

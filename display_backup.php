@@ -26,18 +26,26 @@ include_once($config['base_path'] . '/plugins/ciscotools/class.Diff.php');
 
 function ciscotools_displaybackup() {
     global $config, $item_rows;
+    /* ================= input validation and session storage ================= */
+    $filters = array(
+		'rows' => array(
+			'filter' => FILTER_VALIDATE_INT,
+			'pageset' => true,
+			'default' => '-1'
+			),
+		'page' => array(
+			'filter' => FILTER_VALIDATE_INT,
+			'default' => '1'
+			),
+		'description' => array(
+			'filter' => FILTER_DEFAULT,
+			'pageset' => true,
+			'default' => ''
+			)
+	);
+
+	validate_store_request_vars($filters, 'sess_ciscotools_backup');
 	/* ================= input validation ================= */
-	input_validate_input_number(get_request_var("page"));
-	input_validate_input_number(get_request_var("rows"));
-	/* ==================================================== */
-	// clean up description
-	if (isset_request_var('description') ) {
-		set_request_var('description', sanitize_search_string(get_request_var("description")) );
-	}
-	/* remember these search fields in session vars so we don't have to keep passing them around */
-	load_current_session_value("page", "sess_ciscotools_current_page", "1");
-	load_current_session_value("rows", "sess_ciscotools_rows", "-1");
-	load_current_session_value("description", "sess_ciscotools_description", "");
 
 	$sql_where  = '';
 	$description       = get_request_var_request("description");
@@ -98,24 +106,15 @@ function ciscotools_displaybackup() {
 	<script type="text/javascript">
 	<!--
 	
-	function applyFilterChange(objForm) {
-		strURL = '?header=false&action=backup'
-		streURL += '&description=' + objForm.description.value;
-		strURL += '&rows=' + objForm.rows.value;
-		document.location = strURL;
+	function applyFilter() {
+		strURL  = '?header=false&action=backup';
+		strURL += '&description=' + $('#description').val();
+		strURL += '&rows=' + $('#rows').val();
+		loadPageNoHeader(strURL);
 	}
+
 	function clearFilter() {
-		<?php
-			kill_session_var("sess_ciscotools_description");
-			kill_session_var("sess_ciscotools_current_page");
-			kill_session_var("sess_ciscotools_rows");
-	
-			unset($_REQUEST["page"]);
-			unset($_REQUEST["rows"]);
-			unset($_REQUEST["description"]);
-			
-		?>
-		strURL  = 'ciscotools_tab.php?action=backup&header=false';
+		strURL  = 'ciscotools_tab.php?action=backup&header=false&clear=1';
 		loadPageNoHeader(strURL);
 	}
 	
@@ -129,29 +128,29 @@ function ciscotools_displaybackup() {
 	?>
 	<meta charset="utf-8"/>
 		<td class="noprint">
-		<form style="padding:0px;margin:0px;" name="form" method="get" action="<?php print $config['url_path'];?>plugins/ciscotools/ciscotools_tab.php">
+		<form style="padding:0px;margin:0px;" name="form" method="get" action="<?php print $config['url_path'];?>plugins/ciscotools/ciscotools_tab.php?action=backup">
 			<table width="100%" cellpadding="0" cellspacing="0">
 				<tr class="noprint">
 					<td nowrap style='white-space: nowrap;' width="1">
 						&nbsp;Description :&nbsp;
 					</td>
 					<td width="1">
-						<input type="text" name="description" size="25" value="<?php print get_request_var_request("description");?>">
+						<input type="text" name="description" size="25" value="<?php print get_request_var("description");?>">
 					</td>
 				<td nowrap style='white-space: nowrap;' width="1">
 					&nbsp;Rows:&nbsp;
 				</td>
 				<td width="1">
-					<select name="rows" onChange="applyFilterChange(document.form)">
-						<option value="-1"<?php if (get_request_var("rows") == "-1") {?> selected<?php }?>>Default</option>
-						<?php
-						if (sizeof($item_rows) > 0) {
-							foreach ($item_rows as $key => $value) {
-								print "<option value='" . $key . "'"; if (get_request_var("rows") == $key) { print " selected"; } print ">" . $value . "</option>\n";
+						<select id='rows' onChange='applyFilter()'>
+							<option value='-1'<?php if (get_request_var('rows') == '-1') {?> selected<?php }?>><?php print __('Default', 'thold');?></option>
+							<?php
+							if (cacti_sizeof($item_rows)) {
+								foreach ($item_rows as $key => $value) {
+									print "<option value='" . $key . "'"; if (get_request_var('rows') == $key) { print ' selected'; } print '>' . $value . '</option>';
+								}
 							}
-						}
-						?>
-					</select>
+							?>
+						</select>
 				</td>
 					<td nowrap style='white-space: nowrap;'>
 						<input type="submit" value="Go" title="Set/Refresh Filters">
@@ -168,7 +167,7 @@ function ciscotools_displaybackup() {
 	html_end_box();
 	html_start_box('', '100%', '', '3', 'center', '');
 	
-	$nav = html_nav_bar('ciscotools_tab.php', MAX_DISPLAY_PAGES, get_request_var('page'), $per_row, $total_rows, 12, __('Devices'), 'page', 'main');
+	$nav = html_nav_bar('ciscotools_tab.php?action=backup', MAX_DISPLAY_PAGES, get_request_var('page'), $per_row, $total_rows, 12, __('Devices'), 'page', 'main');
 	
 	print $nav;
 	

@@ -162,6 +162,7 @@ function ciscotools_upgrade_get_version($infosDevice)
     $modelRegex = '/STRING: "(.*)"$/';
     foreach($upgradeInfos as $row)
     {
+//		    function ciscotools_upgrade_snmp_walk($snmpVersion, $snmpCommunity, $deviceIP, $oid, $snmpInfos) 
         $snmpModel = ciscotools_upgrade_snmp_walk("2c", "telvlsn", $row['snmp_SysObjectId'], $row['oid_model'], $infosDevice);
         preg_match_all($modelRegex, $snmpModel, $model);
         if($model)

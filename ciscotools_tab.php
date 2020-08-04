@@ -26,7 +26,6 @@ include_once('./include/auth.php');
 
 set_default_action('backup');
 
-
 switch(get_request_var('action')) {
 	case 'diff':
 		general_header();
