@@ -37,6 +37,14 @@ function ciscotools_displaybackup() {
 			'filter' => FILTER_VALIDATE_INT,
 			'default' => '1'
 			),
+		'sort_column' => array(
+			'filter' => FILTER_DEFAULT,
+			'default' => 'host.id'
+			),
+		'sort_direction' => array(
+			'filter' => FILTER_DEFAULT,
+			'default' => 'ASC',
+			),
 		'description' => array(
 			'filter' => FILTER_DEFAULT,
 			'pageset' => true,
@@ -46,6 +54,8 @@ function ciscotools_displaybackup() {
 
 	validate_store_request_vars($filters, 'sess_ciscotools_backup');
 	/* ================= input validation ================= */
+	$sort_column = get_request_var('sort_column');
+	$sort_direction = get_request_var('sort_direction');
 
 	$sql_where  = '';
 	$description       = get_request_var_request("description");
@@ -77,7 +87,7 @@ function ciscotools_displaybackup() {
 			FROM host, plugin_ciscotools_backup pctb
 			WHERE host.id=pctb.host_id
 			$sql_where
-			ORDER BY host.id 
+			ORDER BY ".$sort_column." ".$sort_direction." 
 			LIMIT " . $sql_limit;
 	
 	$result = db_fetch_assoc($sql_query); // query result is one entry par backup
@@ -180,11 +190,28 @@ function ciscotools_displaybackup() {
 		"diff" => array("Backup or Diff", ""),
 		"nosort" => array("", ""));
 	
-	html_header_sort($display_text, '', '', false);
+/* html_header_sort - draws a header row suitable for display inside of a box element.  When
+        a user selects a column header, the collback function "filename" will be called to handle
+        the sort the column and display the altered results.
+   @arg $header_items - an array containing a list of column items to display.  The
+        format is similar to the html_header, with the exception that it has three
+        dimensions associated with each element (db_column => display_text, default_sort_order)
+        alternatively (db_column => array('display' = 'blah', 'align' = 'blah', 'sort' = 'blah'))
+   @arg $sort_column - the value of current sort column.
+   @arg $sort_direction - the value the current sort direction.  The actual sort direction
+        will be opposite this direction if the user selects the same named column.
+   @arg $last_item_colspan - the TD 'colspan' to apply to the last cell in the row
+   @arg $url - a base url to redirect sort actions to
+   @arg $return_to - the id of the object to inject output into as a result of the sort action 
+
+   function html_header_sort($header_items, $sort_column, $sort_direction, $last_item_colspan = 1, $url = '', $return_to = '') {
+*/
+	
+	html_header_sort($display_text, $sort_column, $sort_direction, false, 'ciscotools_tab.php?action=backup');
 
 	if (!empty($devices)) {
-			$class   = 'odd';
-			// $page contain the start value, $row the number to display
+		$class   = 'odd';
+		// $page contain the start value, $row the number to display
 		foreach($devices as $row) {
 					($class == 'odd' )?$class='even':$class='odd';
 					$type_string = ($row['count']>1)?'>DIFF':'>Backup';
