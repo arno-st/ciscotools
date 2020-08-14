@@ -58,7 +58,7 @@ function ciscotools_displaybackup() {
 	$sort_direction = get_request_var('sort_direction');
 
 	$sql_where  = '';
-	$description       = get_request_var_request("description");
+	$description = get_request_var_request("description");
 	
 	if ($description != '') {
 		$sql_where .= " AND " . "host.description like '%$description%'";

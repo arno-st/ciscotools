@@ -24,6 +24,7 @@
 
 include_once($config['base_path'] . '/plugins/ciscotools/upgrade/display_upgrade.php');
 include_once($config['base_path'] . '/plugins/ciscotools/display_backup.php');
+include_once($config['base_path'] . '/plugins/ciscotools/display_mac.php');
 include_once($config['base_path'] . '/plugins/ciscotools/backup.php');
 include_once($config['base_path'] . '/plugins/ciscotools/upgrade/upgrade.php');
 include_once($config['base_path'] . '/plugins/ciscotools/upgrade/upgrade_table.php');
@@ -146,27 +147,9 @@ function ciscotools_check_upgrade() {
             );
 		}
 		if( $old < '1.2' ) {
-/* table to keep MAC information */
-			$data = array();
-			$data['columns'][] = array('name' => 'id', 'type' => 'mediumint(8)', 'auto_increment'=>'');
-			$data['columns'][] = array('name' => 'host_id', 'type' => 'mediumint(8)', 'NULL' => false, 'default' => '0');
-			$data['columns'][] = array('name' => 'mac_address', 'type' => 'varchar(12)', 'NULL' => false, 'default' => '0');
-			$data['columns'][] = array('name' => 'ip_address', 'type' => 'varchar(8)', 'NULL' => true, 'default' => '0');
-			$data['columns'][] = array('name' => 'ipv6_address', 'type' => 'varchar(16)', 'NULL' => true, 'default' => '0');
-			$data['columns'][] = array('name' => 'port', 'type' => 'varchar(255)', 'NULL' => false);
-		    $data['columns'][] = array('name' => 'vlan', 'type' => 'varchar(4)', 'NULL' => false);
-			$data['primary'] = 'id';
-			$data['keys'][] = array('name' => 'id', 'columns' => 'id');
-			$data['keys'][] = array('name' => 'host_id', 'columns' => 'host_id');
-			$data['keys'][] = array('name' => 'mac_address', 'columns' => 'mac_address');
-			$data['keys'][] = array('name' => 'vlan', 'columns' => 'vlan');
-			$data['type'] = 'InnoDB';
-			$data['comment'] = 'Plugin ciscotoole - Table for MacTrack information';
-			api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_mactrack', $data);
-			// add mac info into the host table
-			api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'keep_mac_track', 'type' => 'varchar(2)', 'NULL' => true, 'default' => ''));
 		}
 	}
+	ciscotools_setup_tables();
 }
 
 function ciscotools_setup_tables() {
@@ -196,6 +179,34 @@ function ciscotools_setup_tables() {
 	$data['type'] = 'InnoDB';
 	$data['comment'] = 'Plugin ciscotoole - Table for diff in config change';
 	api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_backup', $data);
+
+/* table to keep MAC information */
+	$data = array();
+	$data['columns'][] = array('name' => 'id', 'type' => 'mediumint(8)', 'auto_increment'=>'');
+	$data['columns'][] = array('name' => 'host_id', 'type' => 'mediumint(8)', 'NULL' => false, 'default' => '0');
+	$data['columns'][] = array('name' => 'mac_address', 'type' => 'varchar(12)', 'NULL' => false, 'default' => '0');
+	$data['columns'][] = array('name' => 'ip_address', 'type' => 'varchar(20)', 'NULL' => true, 'default' => '0');
+	$data['columns'][] = array('name' => 'ipv6_address', 'type' => 'varchar(32)', 'NULL' => true, 'default' => '0');
+	$data['columns'][] = array('name' => 'port_index', 'type' => 'varchar(255)', 'NULL' => false);
+    $data['columns'][] = array('name' => 'vlan_id', 'type' => 'varchar(4)', 'NULL' => false);
+    $data['columns'][] = array('name' => 'vlan_name', 'type' => 'varchar(50)', 'NULL' => false);
+    $data['columns'][] = array('name' => 'description', 'type' => 'varchar(200)', 'NULL' => false);
+    $data['columns'][] = array('name' => 'date', 'type' => 'varchar(24)', 'NULL' => false);
+	$data['primary'] = 'id';
+	$data['keys'][] = array('name' => 'id', 'columns' => 'id');
+	$data['keys'][] = array('name' => 'host_id', 'columns' => 'host_id');
+	$data['keys'][] = array('name' => 'ip_address', 'columns' => 'ip_address');
+	$data['keys'][] = array('name' => 'mac_address', 'columns' => 'mac_address');
+	$data['keys'][] = array('name' => 'vlan_id', 'columns' => 'vlan_id');
+	$data['keys'][] = array('name' => 'vlan_name', 'columns' => 'vlan_name');
+	$data['keys'][] = array('name' => 'description', 'columns' => 'description');
+	$data['type'] = 'InnoDB';
+	$data['comment'] = 'Plugin ciscotoole - Table for MacTrack information';
+	api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_mactrack', $data);
+	db_add_index('plugin_ciscotools_mactrack', 'UNIQUE', 'record', array('host_id','mac_address','port_index') );
+	//ALTER TABLE `plugin_ciscotools_mactrack` ADD UNIQUE( `host_id`, `mac_address`, `port_index`); 
+	// add mac info into the host table
+	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'keep_mac_track', 'type' => 'varchar(2)', 'NULL' => true, 'default' => ''));
 }
 
 function plugin_ciscotools_version () {
@@ -211,7 +222,8 @@ function ciscotools_check_dependencies() {
 }
 
 function ciscotools_config_arrays () {
-	global $ciscotools_console_type,$ciscotools_backup_frequencies,$ciscotools_retention_duration;
+	global $ciscotools_console_type,$ciscotools_backup_frequencies, $ciscotools_retention_duration, $mactrack_poller_frequencies,
+	$mactrack_data_retention;
 
 	$ciscotools_console_type = array(
 		"0" => "Disabled",
@@ -236,6 +248,34 @@ function ciscotools_config_arrays () {
 		"-6 months" => "6 months",
 		"-1 years" => "1 year"
 		);
+
+	$mactrack_poller_frequencies = array(
+		'disabled' => __('Disabled', 'mactrack'),
+		'600'       => __('Every %d Minutes', 10, 'mactrack'),
+		'900'       => __('Every %d Minutes', 15, 'mactrack'),
+		'1200'       => __('Every %d Minutes', 20, 'mactrack'),
+		'1800'       => __('Every %d Minutes', 30, 'mactrack'),
+		'3600'       => __('Every %d Hour', 1, 'mactrack'),
+		'7200'      => __('Every %d Hours', 2, 'mactrack'),
+		'14400'      => __('Every %d Hours', 4, 'mactrack'),
+		'28800'      => __('Every %d Hours', 8, 'mactrack'),
+		'43200'      => __('Every %d Hours', 12, 'mactrack'),
+		'86400'     => __('Every Day', 'mactrack')
+	);
+
+	$mactrack_data_retention = array(
+		'-3 days'   => __('%d Days', 3, 'mactrack'),
+		'-7 days'   => __('%d Days', 7, 'mactrack'),
+		'-10 days'  => __('%d Days', 10, 'mactrack'),
+		'-14 days'  => __('%d Days', 14, 'mactrack'),
+		'-20 days'  => __('%d Days', 20, 'mactrack'),
+		'-1 months'  => __('%d Month', 1, 'mactrack'),
+		'-2 months'  => __('%d Months', 2, 'mactrack'),
+		'-4 months' => __('%d Months', 4, 'mactrack'),
+		'-8 months' => __('%d Months', 8, 'mactrack'),
+		'-1 years' => __('%d Year', 1, 'mactrack')
+	);
+
 }
 
 function ciscotools_config_form () {
@@ -309,7 +349,8 @@ function ciscotools_config_form () {
 }
 
 function ciscotools_config_settings () {
-	global $config, $tabs, $settings, $ciscotools_console_type, $ciscotools_backup_frequencies, $ciscotools_retention_duration;
+	global $config, $tabs, $settings, $ciscotools_console_type, $ciscotools_backup_frequencies, 
+	$ciscotools_retention_duration, $mactrack_poller_frequencies, $mactrack_data_retention;
 
 	if (isset($_SERVER['PHP_SELF']) && basename($_SERVER['PHP_SELF']) != 'settings.php')
 		return;
@@ -392,6 +433,24 @@ function ciscotools_config_settings () {
 			'method' => 'checkbox',
 			'default' => 'off'
 		),
+		'ciscotools_mac_hdr_timing' => array(
+			'friendly_name' => __('Mactrack Settings', 'mactrack'),
+			'method' => 'spacer',
+			),
+		'ciscotools_mac_collection_timing' => array(
+			'friendly_name' => __('Scanning Frequency', 'mactrack'),
+			'description' => __('Choose when to collect MAC and IP Addresses and Interface statistics from your network devices.', 'mactrack'),
+			'method' => 'drop_array',
+			'default' => 'disabled',
+			'array' => $mactrack_poller_frequencies,
+			),
+		'ciscotools_mac_data_retention' => array(
+			'friendly_name' => __('Data Retention', 'mactrack'),
+			'description' => __('How long should port MAC details be retained in the database.', 'mactrack'),
+			'method' => 'drop_array',
+			'default' => '2weeks',
+			'array' => $mactrack_data_retention,
+			),
 		'ciscotools_default_keep_mac_track' => array(
 			'friendly_name' => "Default Do we keep the mac list",
 			'description' => "Enable if we need to keep the mac information on mactrack table.",
@@ -422,46 +481,46 @@ function ciscotools_api_device_new($hostrecord_array) {
 	}
 
 	if (isset_request_var('login')) {
-		$hostrecord_array['login'] = form_input_validate(get_filter_request_var('login'), 'login', '', true, 3);
+		$hostrecord_array['login'] = form_input_validate(get_nfilter_request_var('login'), 'login', '', true, 3);
 	} else {
 		$hostrecord_array['login'] = form_input_validate('', 'login', '', true, 3);
 	}
 	
 	if (isset_request_var('password')) {
-		$hostrecord_array['password'] = form_input_validate(get_filter_request_var('password'), 'password', '', true, 3);
+		$hostrecord_array['password'] = form_input_validate(get_nfilter_request_var('password'), 'password', '', true, 3);
 	} else {
 		$hostrecord_array['password'] = form_input_validate('', 'password', '', true, 3);
 	}
 	
 	if (isset_request_var('console_type')) {
-		$hostrecord_array['console_type'] = form_input_validate(get_filter_request_var('console_type'), 'console_type', '', true, 3);
+		$hostrecord_array['console_type'] = form_input_validate(get_nfilter_request_var('console_type'), 'console_type', '', true, 3);
 	} else {
 		$hostrecord_array['console_type'] = form_input_validate('', 'console_type', '', true, 3);
 	}
 // following change is present only if ON
 	if (isset_request_var('can_be_upgraded')) {
-		$hostrecord_array['can_be_upgraded'] = form_input_validate(get_filter_request_var('can_be_upgraded'), 'can_be_upgraded', '', true, 3);
+		$hostrecord_array['can_be_upgraded'] = form_input_validate(get_nfilter_request_var('can_be_upgraded'), 'can_be_upgraded', '', true, 3);
 	} else {
 		$hostrecord_array['can_be_upgraded'] = form_input_validate('off', 'can_be_upgraded', '', true, 3);
 	}
 	
 	if (isset_request_var('can_be_rebooted')) {
-		$hostrecord_array['can_be_rebooted'] = form_input_validate(get_filter_request_var('can_be_rebooted'), 'can_be_rebooted', '', true, 3);
+		$hostrecord_array['can_be_rebooted'] = form_input_validate(get_nfilter_request_var('can_be_rebooted'), 'can_be_rebooted', '', true, 3);
 	} else {
 		$hostrecord_array['can_be_rebooted'] = form_input_validate('off', 'can_be_rebooted', '', true, 3);
 	}
 
 	if (isset_request_var('do_backup')) {
-		$hostrecord_array['do_backup'] = form_input_validate(get_filter_request_var('do_backup'), 'do_backup', '', true, 3);
+		$hostrecord_array['do_backup'] = form_input_validate(get_nfilter_request_var('do_backup'), 'do_backup', '', true, 3);
 	} else {
 		$hostrecord_array['do_backup'] = form_input_validate('off', 'do_backup', '', true, 3);
 	}
 	
 	if (isset_request_var('keep_mac_track')) {
-		$hostrecord_array['keep_mac_track'] = form_input_validate(get_filter_request_var('keep_mac_track'), 'keep_mac_track', '', true, 3);
+		$hostrecord_array['keep_mac_track'] = form_input_validate(get_nfilter_request_var('keep_mac_track'), 'keep_mac_track', '', true, 3);
 		get_mac_table($hostrecord_array);
 	} else {
-		$hostrecord_array['keep_mac_track'] = form_input_validate('', 'keep_mac_track', '', true, 3);
+		$hostrecord_array['keep_mac_track'] = form_input_validate('off', 'keep_mac_track', '', true, 3);
 	}
 
 	sql_save($hostrecord_array, 'host');
@@ -472,6 +531,7 @@ function ciscotools_api_device_new($hostrecord_array) {
 function ciscotools_device_action_array($device_action_array) {
 	$device_action_array['ciscotools_upgrade'] = __('Force upgrade');
 	$device_action_array['ciscotools_backup'] = __('Force Backup');
+	$device_action_array['ciscotools_mactrack'] = __('Force Mac Pooling');
 
 	return $device_action_array;
 }
@@ -479,7 +539,7 @@ function ciscotools_device_action_array($device_action_array) {
 function ciscotools_device_action_execute($action) {
 	global $config;
 
-	if ($action != 'ciscotools_upgrade' && $action != 'ciscotools_backup') {
+	if ($action != 'ciscotools_upgrade' && $action != 'ciscotools_backup' && $action != 'ciscotools_mactrack') {
 		return $action;
 	}
 
@@ -491,6 +551,9 @@ function ciscotools_device_action_execute($action) {
 				ciscotools_upgrade_table($selected_items[$i], 'force');
 			} else if($action == 'ciscotools_backup') {
 				ciscotools_backup($selected_items[$i]);
+			} else if($action == 'ciscotools_mactrack') {
+				$hostrecord_array = db_fetch_row( 'SELECT *  FROM host where id='.$selected_items[$i] );
+				get_mac_table($hostrecord_array);
 			}
 		}
 	}
@@ -502,15 +565,13 @@ function ciscotools_device_action_prepare($save) {
 
         $action = $save['drp_action'];
 
-        if ($action != 'ciscotools_upgrade' || $action != 'ciscotools_backup') {
-			return $save;
-        }
-
         if ($action == 'ciscotools_upgrade') {
-			$action_description = 'Upgrade selected device';
+			$action_description = 'Upgrade selected devices';
 		} else if ($action == 'ciscotools_backup') {
-			$action_description = "Backup selected device.";
-		}
+			$action_description = "Backup selected devices.";
+		} else if ($action == 'ciscotools_mactrack') {
+			$action_description = "Pool mac address on selected devices.";
+		} else return $save;
 		
 		print "<tr>
 			<td colspan='2' class='even'>
@@ -518,6 +579,7 @@ function ciscotools_device_action_prepare($save) {
 				<p><div class='itemlist'><ul>" . $save['host_list'] . "</ul></div></p>
 			</td>
 		</tr>"; 
+		
 	return $save;
 }
 
@@ -532,7 +594,8 @@ function ciscotools_poller_bottom () {
 	$lastPoller = read_config_option('ciscotools_upgrade_lastPoll'); // See when was the last poll for an upgrade
 	
 	if((time() - $lastPoller) <= $pollerIntervalUpgrade) {
-		ciscotools_log("Upgrade: time: " . time() . " | lp: " . $lastPoller . " | poller: " . $pollerIntervalUpgrade . " | diff: " . (time() - $lastPoller));
+		ciscotools_log("Upgrade: time: " . time() . " | lp: " . $lastPoller . " | poller: " . $pollerIntervalUpgrade 
+		. " | diff: " . (time() - $lastPoller));
 	}
 	else {
 		$upgradeCmdString = trim(read_config_option('path_php_binary'));
@@ -560,35 +623,56 @@ function ciscotools_poller_bottom () {
 	$lp = read_config_option('ciscotools_last_poll');
 
 	if ((time() - $lp) <= $poller_interval ){
-		ciscotools_log('time: '.time().' lp: '. $lp .' poller: '. $poller_interval.' diff: '.(time() - $lp));
-		return;
-	}
-
-	set_config_option('ciscotools_last_poll', time());
-	
-	ciscotools_log('Go time: '.time().' lp: '. $lp .' poller: '. $poller_interval.' diff: '.(time() - $lp));
-
-	// this function take too long to call it directly, we have to call it in background
-	// a check has to be made to be sure not to run it twice
-	$command_string = trim(read_config_option('path_php_binary'));
-
-	// If its not set, just assume its in the path
-	if (trim($command_string) == '')
-		$command_string = 'php';
-		$extra_args = ' -q ' . $config['base_path'] . '/plugins/ciscotools/check_backup.php';
-	if( read_config_option('ciscotools_backup_running') != 'on' ) {
-		cacti_log('Start Backup', false, 'CISCOTOOLS');
-		set_config_option('ciscotools_backup_running', 'on');
-		exec_background($command_string, $extra_args);
+		ciscotools_log('Backup time: '.time().' lp: '. $lp .' poller: '. $poller_interval.' diff: '.(time() - $lp));
 	} else {
-		cacti_log('Backup is running', false, 'CISCOTOOLS');
-	}
 
-// purge poller, test is made only when we should do a backup, to avoid overload of the pooler bottom
-	purge_backup();
+		set_config_option('ciscotools_last_poll', time());
 	
+		ciscotools_log('Backup Go time: '.time().' lp: '. $lp .' poller: '. $poller_interval.' diff: '.(time() - $lp));
+
+		// this function take too long to call it directly, we have to call it in background
+		// a check has to be made to be sure not to run it twice
+		$command_string = trim(read_config_option('path_php_binary'));
+		
+		// If its not set, just assume its in the path
+		if (trim($command_string) == '')
+			$command_string = 'php';
+			$extra_args = ' -q ' . $config['base_path'] . '/plugins/ciscotools/check_backup.php';
+		if( read_config_option('ciscotools_backup_running') != 'on' ) {
+			cacti_log('Start Backup', false, 'CISCOTOOLS');
+			set_config_option('ciscotools_backup_running', 'on');
+			exec_background($command_string, $extra_args);
+// purge poller, test is made only when we should do a backup, to avoid overload of the pooler bottom
+			purge_backup();
+		} else {
+			cacti_log('Backup is running', false, 'CISCOTOOLS');
+		}
+	}
 	// mactrack poller
-//	get_mac_table($hostrecord_array);
+	$pollerIntervalMac = read_config_option('ciscotools_mac_collection_timing');
+	$lastMacPoller = read_config_option('ciscotools_mac_lastPoll'); // See when was the last poll for an mac update
+	
+	if((time() - $lastMacPoller) <= $pollerIntervalMac) {
+		ciscotools_log("Mac Poller: time: " . time() . " | lp: " . $lastMacPoller . " | poller: " . $pollerIntervalMac 
+		. " | diff: " . (time() - $lastMacPoller));
+	}
+	else {
+		$macCmdString = trim(read_config_option('path_php_binary'));
+		// If its not set, just assume its in the path
+		if (trim($macCmdString) == '')
+			$macCmdString = 'php';
+			$macExtrArgs = ' -q ' . $config['base_path'] . '/plugins/ciscotools/pool_mac.php';
+		if(read_config_option('ciscotools_mac_running') != 'on' ) {
+			cacti_log('Start Mac polling', false, 'CISCOTOOLS');
+			set_config_option('ciscotools_mac_running', 'on');
+			exec_background($macCmdString, $macExtrArgs);
+			purge_mac();
+
+		} else {
+			cacti_log('Mac Check is running', false, 'CISCOTOOLS');
+		}
+		set_config_option('ciscotools_mac_lastPoll', time()); // Set the last poll for an mac check
+	}
 
 }
 
