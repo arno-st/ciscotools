@@ -139,7 +139,7 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 //ciscotools_log('get bridge port global');
 		$bridge_port_array = cacti_snmp_walk( $hostrecord_array['hostname'], $snmp_community, 
 		$snmp_bridge_port_number, $hostrecord_array['snmp_version'] ); // return a value used to get index of internet interface, and oid with the mac
-ciscotools_log('get bridge port global: '.print_r($bridge_port_array,true) );
+//ciscotools_log('get bridge port global: '.print_r($bridge_port_array,true) );
 		if( empty($bridge_port_array) ) continue; // if no bridge port, no mac, go further
 		
 //ciscotools_log('get itf index global');
@@ -158,7 +158,7 @@ ciscotools_log('get bridge port global: '.print_r($bridge_port_array,true) );
 		$snmp_is_trunk, $hostrecord_array['snmp_version'] );
 //ciscotools_log('get itf trunk: '.print_r($intf_trunk_array, true) );
 
-ciscotools_log('format mac:'.print_r($mac_address_array, true));
+//ciscotools_log('format mac:'.print_r($mac_address_array, true));
 		// save to the return array
 		// take each mac address
 		foreach($mac_address_array as $key => $mac_address){
@@ -167,10 +167,10 @@ ciscotools_log('format mac:'.print_r($mac_address_array, true));
 			$mac_array[$cnt]['vlan_id'] = $vlan_array[$vlankey]['id'];
 			$mac_array[$cnt]['vlan_name'] = $vlan_array[$vlankey]['name'];
 
-ciscotools_log('get itf index from array:'.$key );
+//ciscotools_log('get itf index from array:'.$key );
 			// get interface index from bridge port
 			$bridge_index = $snmp_bridge_2_index . '.' . $bridge_port_array[$key]['value'];
-ciscotools_log('oid:'.$bridge_index );
+//ciscotools_log('oid:'.$bridge_index );
 			foreach( $intf_index_array as $bridge2index ){
 				$mac_array[$cnt]['port_index'] = '';
 				if( $bridge2index['oid'] != $bridge_index) continue;
@@ -217,7 +217,6 @@ ciscotools_log('oid:'.$bridge_index );
 				break;
 			}
 
-//ciscotools_log('write to DB');
 			$mysql = ("INSERT INTO plugin_ciscotools_mactrack (host_id,mac_address,port_index,vlan_id,vlan_name,date) 
 				VALUES ('".
 				$hostrecord_array['id']."','".
@@ -228,6 +227,7 @@ ciscotools_log('oid:'.$bridge_index );
 				date("YmdHis")."') ON DUPLICATE KEY UPDATE date='".
 				date("YmdHis")."'"
 				);
+ciscotools_log('write to DB: '.$mysql);
 			$ret = db_execute($mysql);
 			$cnt++;
 		}
