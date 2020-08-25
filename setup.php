@@ -182,7 +182,7 @@ function ciscotools_setup_tables() {
 
 /* table to keep MAC information */
 	$data = array();
-	$data['columns'][] = array('name' => 'id', 'type' => 'mediumint(8)', 'auto_increment'=>'');
+	$data['columns'][] = array('name' => 'id', 'type' => 'int(20)', 'auto_increment'=>'');
 	$data['columns'][] = array('name' => 'host_id', 'type' => 'mediumint(8)', 'NULL' => false, 'default' => '0');
 	$data['columns'][] = array('name' => 'mac_address', 'type' => 'varchar(12)', 'NULL' => false, 'default' => '0');
 	$data['columns'][] = array('name' => 'ip_address', 'type' => 'varchar(20)', 'NULL' => true, 'default' => '0');
