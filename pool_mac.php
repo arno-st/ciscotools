@@ -37,6 +37,16 @@ include(dirname(__FILE__).'/../../include/global.php');
 include_once($config['base_path'].'/lib/utility.php');
 include_once($config['base_path'] . '/plugins/ciscotools/setup.php');
 
+// process calling arguments
+$parms = $_SERVER['argv'];
+
+//process number
+$process_no = $parms[1];
+
+// number of process
+$nb_process = $parms[2];
+if(empty($nb_process)) $nb_process=1; // just in case the configuration is not saved, nb_process will be empty
+
 /* check which device we have to poll */
     // pool for every Cisco device or not ?, if TRUE, then exclude device that are FALSE or not Cisco
     /*
@@ -49,18 +59,25 @@ include_once($config['base_path'] . '/plugins/ciscotools/setup.php');
     } else {
         $sqlqueryfilter = "keep_mac_track='on' AND snmp_sysObjectID LIKE 'iso.3.6.1.4.1.9%' AND disabled !='on' AND status ='3'";
     }
-    $dbquery = db_fetch_assoc("SELECT * FROM host WHERE ".$sqlqueryfilter);
+    $dbquery = db_fetch_assoc("SELECT * FROM host WHERE ".$sqlqueryfilter );
     if( $dbquery === false ){
         cacti_log('No device to pool', false, 'CISCOTOOLS');
         return; // no host to pool
     }
-    ciscotools_log("need to pool on: ". count($dbquery)." hosts" );
-    
+
+	$nbdevices_per_process = round(count($dbquery)/$nb_process, 0, PHP_ROUND_HALF_UP);
+	$start = $nbdevices_per_process * ($process_no-1);
+
+	$mysql ='SELECT * FROM host WHERE '.$sqlqueryfilter.' LIMIT '.$start.','.$nbdevices_per_process;
+
+	$hostrecord_array = db_fetch_assoc($mysql);
     // do pooling for all device discovered
-    foreach( $dbquery as $hostrecord ){
+	foreach( $hostrecord_array as $hostrecord ) {
 		get_mac_table($hostrecord);
-    }
+	}
 	
-	set_config_option('ciscotools_mac_running', 'off'); // set the end of the process
-    cacti_log( 'Mac polling ended', false, 'CISCOTOOLS');
+	if($process_no == $nb_process ){
+		set_config_option('ciscotools_mac_running', 'off'); // set the end of the process
+		cacti_log( 'Mac polling ended', false, 'CISCOTOOLS');
+	}
 ?>

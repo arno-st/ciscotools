@@ -186,29 +186,29 @@ table plugin_ciscotools_mactrack
 						&nbsp;Switch name :&nbsp;
 					</td>
 					<td width="1">
-						<input type="text" name="switch" size="25" value="<?php print get_request_var("switch");?>">
+						<input type="text" name="switch" size="20" value="<?php print get_request_var("switch");?>">
 					</td>
 					<td nowrap style='white-space: nowrap;' width="1">
 						&nbsp;MAC address :&nbsp;
 					</td>
 					<td width="1">
-						<input type="text" name="mac_address" size="25" value="<?php print get_request_var("mac_address");?>">
+						<input type="text" name="mac_address" size="20" value="<?php print get_request_var("mac_address");?>">
 					</td>
 					<td nowrap style='white-space: nowrap;' width="1">
 						&nbsp;IP address :&nbsp;
 					</td>
 					<td width="1">
-						<input type="text" name="ip_address" size="25" value="<?php print get_request_var("ip_address");?>">
+						<input type="text" name="ip_address" size="20" value="<?php print get_request_var("ip_address");?>">
 					</td>
 					<td nowrap style='white-space: nowrap;' width="1">
 						&nbsp;Node Name :&nbsp;
 					</td>
 					<td width="1">
-						<input type="text" name="description" size="25" value="<?php print get_request_var("description");?>">
+						<input type="text" name="description" size="20" value="<?php print get_request_var("description");?>">
 					</td>
 					<td nowrap style='white-space: nowrap;' width="1">
 				<td nowrap style='white-space: nowrap;' width="1">
-					&nbsp;&nbsp;Remove Trunk:&nbsp;&nbsp;
+					&nbsp;Remove Trunk:&nbsp;
 				</td>
 				<td width="1">
 					<input type="checkbox" name="no_trunk" value="1" <?php ($no_trunk=='1')?print " checked":print "" ?>>

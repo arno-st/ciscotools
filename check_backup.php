@@ -64,7 +64,6 @@ include_once($config['base_path'] . '/plugins/ciscotools/setup.php');
 			cacti_log('Device: '.$host['description']. ' can not read version', false, 'CISCOTOOLS');
 			continue;
 		}
-        ciscotools_log('lastchange: '.$lastchange );
 
         // check if it's time to backup, depending of the last change recorded
         $savedchange = db_fetch_cell("SELECT datechange FROM plugin_ciscotools_backup WHERE host_id=".$host['id']." ORDER BY version DESC LIMIT 1");

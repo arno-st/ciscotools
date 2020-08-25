@@ -456,6 +456,13 @@ function ciscotools_config_settings () {
 			'description' => "Enable if we need to keep the mac information on mactrack table.",
 			'method' => 'checkbox',
 			'default' => 'off',
+			),
+		'ciscotools_nb_mactrack_process' => array(
+			'friendly_name' => "Number of mactrack process",
+			'description' => "The number of processs we can start to do the mactracking function.",
+			'method' => 'textbox',
+			'max_length' => 5,
+			'default' => '2'
 		)
 	);
 }
@@ -651,6 +658,7 @@ function ciscotools_poller_bottom () {
 	// mactrack poller
 	$pollerIntervalMac = read_config_option('ciscotools_mac_collection_timing');
 	$lastMacPoller = read_config_option('ciscotools_mac_lastPoll'); // See when was the last poll for an mac update
+	$mactrack_nb_process = read_config_option('ciscotools_nb_mactrack_process'); // how many process we spawn
 	
 	if((time() - $lastMacPoller) <= $pollerIntervalMac) {
 		ciscotools_log("Mac Poller: time: " . time() . " | lp: " . $lastMacPoller . " | poller: " . $pollerIntervalMac 
@@ -661,11 +669,15 @@ function ciscotools_poller_bottom () {
 		// If its not set, just assume its in the path
 		if (trim($macCmdString) == '')
 			$macCmdString = 'php';
-			$macExtrArgs = ' -q ' . $config['base_path'] . '/plugins/ciscotools/pool_mac.php';
 		if(read_config_option('ciscotools_mac_running') != 'on' ) {
 			cacti_log('Start Mac polling', false, 'CISCOTOOLS');
 			set_config_option('ciscotools_mac_running', 'on');
-			exec_background($macCmdString, $macExtrArgs);
+			$process = 1;
+			do {
+				$macExtrArgs = ' -q ' . $config['base_path'] . '/plugins/ciscotools/pool_mac.php '.$process .' '.$mactrack_nb_process;
+				exec_background($macCmdString, $macExtrArgs);
+				$process++;
+			} while ( $process <= $mactrack_nb_process );
 			purge_mac();
 
 		} else {
