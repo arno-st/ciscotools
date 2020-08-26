@@ -146,10 +146,13 @@ function ciscotools_check_upgrade() {
                 ('C9500-16X', 'cat9k_iosxe.16.09.05.SPA.bin', 'install')"
             );
 		}
-		if( $old < '1.2' ) {
+		if( $old < '1.2.2' ) {
 		}
 	}
 	ciscotools_setup_tables();
+
+	// if mac running is on change for a number to know how many process are running
+	if( read_config_option('ciscotools_mac_running') == 'off' ) set_config_option('ciscotools_mac_running', '0');
 }
 
 function ciscotools_setup_tables() {
@@ -669,9 +672,9 @@ function ciscotools_poller_bottom () {
 		// If its not set, just assume its in the path
 		if (trim($macCmdString) == '')
 			$macCmdString = 'php';
-		if(read_config_option('ciscotools_mac_running') != 'on' ) {
+		if( read_config_option('ciscotools_mac_running') == 0 ) {
 			cacti_log('Start Mac polling', false, 'CISCOTOOLS');
-			set_config_option('ciscotools_mac_running', 'on');
+			set_config_option('ciscotools_mac_running', $mactrack_nb_process );
 			$process = 1;
 			do {
 				$macExtrArgs = ' -q ' . $config['base_path'] . '/plugins/ciscotools/pool_mac.php '.$process .' '.$mactrack_nb_process;

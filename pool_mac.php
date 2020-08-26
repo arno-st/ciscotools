@@ -76,8 +76,9 @@ if(empty($nb_process)) $nb_process=2; // just in case the configuration is not s
 		get_mac_table($hostrecord);
 	}
 	
-	if($process_no == $nb_process ){
-		set_config_option('ciscotools_mac_running', 'off'); // set the end of the process
-		cacti_log( 'Mac polling ended', false, 'CISCOTOOLS');
-	}
+	$still_process = read_config_option('ciscotools_mac_running');
+	if( $still_process > 0 ){
+		$still_process--;
+		set_config_option('ciscotools_mac_running', $still_process ); // set the end of the process
+	} else cacti_log( 'Mac polling ended', false, 'CISCOTOOLS');
 ?>

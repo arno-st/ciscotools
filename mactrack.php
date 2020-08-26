@@ -161,6 +161,7 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 //ciscotools_log('format mac:'.print_r($mac_address_array, true));
 		// save to the return array
 		// take each mac address
+		$mac_array[$cnt]['mac_adress'] = '';
 		foreach($mac_address_array as $key => $mac_address){
 			$mac_array[$cnt]['mac_adress'] = str_replace( ' ', '', $mac_address['value']); // and remove space inside
 			if( !is_string($mac_array[$cnt]['mac_adress']) ) continue; // drop record if not correct
@@ -171,11 +172,10 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 			// get interface index from bridge port
 			$bridge_index = $snmp_bridge_2_index . '.' . $bridge_port_array[$key]['value'];
 //ciscotools_log('oid:'.$bridge_index );
+			$mac_array[$cnt]['port_index'] = '0'; // init a 0 value to avoid any error later
 			foreach( $intf_index_array as $bridge2index ){
-				$mac_array[$cnt]['port_index'] = '';
 				if( $bridge2index['oid'] != $bridge_index) continue;
 				$mac_array[$cnt]['port_index'] = $bridge2index['value'];
-				unset($bridge2index); // clear the value to avoid problem
 				break;
 			}
 			unset($bridge2index); // clear the value to avoid problem
@@ -192,12 +192,11 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 				$intf_type = $type4index['value'];
 //ciscotools_log('type value:'.$intf_type );
 				if( $intf_type != 'ethernetCsmacd' ){
-					unset($type4index); // clear the value to avoid problem
 					break 2;
 				}
-				unset($type4index); // clear the value to avoid problem
 				break;
 			}
+			unset($type4index); // clear the value to avoid problem
 
 			// Check if it's a trunk, if so make vlan_name as trunk and id 0
 //ciscotools_log('get itf trunk from array');
@@ -213,9 +212,9 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 					$mac_array[$cnt]['vlan_id']= '0';
 					$mac_array[$cnt]['vlan_name'] = 'trunk';
 				}
-				unset($trunk4index); // clear the value to avoid problem
 				break;
 			}
+			unset($trunk4index); // clear the value to avoid problem
 
 			$mysql = ("INSERT INTO plugin_ciscotools_mactrack (host_id,mac_address,port_index,vlan_id,vlan_name,date) 
 				VALUES ('".
@@ -227,7 +226,7 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 				date("YmdHis")."') ON DUPLICATE KEY UPDATE date='".
 				date("YmdHis")."'"
 				);
-ciscotools_log('write to DB: '.$mysql);
+//ciscotools_log('write to DB: '.$mysql);
 			$ret = db_execute($mysql);
 			$cnt++;
 		}
