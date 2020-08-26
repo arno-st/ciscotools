@@ -263,8 +263,9 @@ function get_vlan( $hostrecord_array ) {
 			break;
 			
 			default:
-				$vlan[$cnt]['id'] = $id;
-				$vlan[$cnt]['name'] = $vlan_names[$key]['value'];
+			$vlan[] = array( 'id' =>  $id, 'name' => $vlan_names[$key]['value'] );
+//				$vlan[$cnt]['id'] = $id;
+//				$vlan[$cnt]['name'] = $vlan_names[$key]['value'];
 				$cnt++;
 			break;
 		}
