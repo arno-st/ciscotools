@@ -45,7 +45,7 @@ $process_no = $parms[1];
 
 // number of process
 $nb_process = $parms[2];
-if(empty($nb_process)) $nb_process=1; // just in case the configuration is not saved, nb_process will be empty
+if(empty($nb_process)) $nb_process=2; // just in case the configuration is not saved, nb_process will be empty
 
 /* check which device we have to poll */
     // pool for every Cisco device or not ?, if TRUE, then exclude device that are FALSE or not Cisco
