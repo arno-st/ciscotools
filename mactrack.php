@@ -54,7 +54,7 @@ function purge_mac(){
 }
 
 function get_mac_table($hostrecord_array) {
-	ciscotools_log('Pool mac for host id:'.$hostrecord_array['description']);
+	ciscotools_log('Pool mac for host:'.$hostrecord_array['description']);
 	// host_id is given by the call on this function, on the array $hostrecord_array
 	// first pool vlan on device: here you got vlan_id and name
 	// second pool mac on each vlan of device: here you add mac address
@@ -84,7 +84,7 @@ function get_ip_4_mac( $hostrecord_array, $mac_array) {
 		$test = preg_match($regex, $ipmac['oid'], $ip_match );
 		$arp_table['ip'] = $ip_match[0];
 		
-		// split the mac value a, dcomplete with 0 if necessary
+		// split the mac value a, complete with 0 if necessary
 		$arp_table['mac'] = '';
 		foreach( explode(':', $ipmac['value']) as $mac ) {
 			$arp_table['mac'] .= str_pad($mac, 2, '0', STR_PAD_LEFT);
@@ -110,19 +110,39 @@ function get_ip_4_mac( $hostrecord_array, $mac_array) {
 /* return an array of mac adress on interface index
  array based on index (same as vlan), array of mac, interface index for each mac and vlan
 array
-	mac_adress
+	mac_address
 	vlan_name
 	vlan_id
-	port_index
+	port_index used to find the iunformation during the display only
+*/
+/* 
+process is the following:
+ex: get all VLAN on the switch (given here as a parameter)
+1: get the interface type (CSMACD, virutal etc)
+2: get interface trunk status (trunk or not)
+3: for each VLANs, get the MAC table (return is OID, value MAC adresse
+4: for each VLANs, get Bridge table with OID include MAC, and Value as index of interface in the bridge port
+5: for each VLANs, get the match between bridge port Index, and physical interface index and store it
 */
 function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 	// https://www.cisco.com/c/en/us/support/docs/ip/simple-network-management-protocol-snmp/44800-mactoport44800.html
 	$snmp_mac_list = '.1.3.6.1.2.1.17.4.3.1.1';
 	$snmp_bridge_port_number = '.1.3.6.1.2.1.17.4.3.1.2'; // bridge port number dans OID il y a MAC, value give bridgport
 	$snmp_bridge_2_index = '.1.3.6.1.2.1.17.1.4.1.2'; // interface index to bridge port number, value donne index interface
-	$snmp_interfaces_type	= ".1.3.6.1.2.1.2.2.1.3"; // take only type ethernetCsmacd(6)
+
+	$snmp_interfaces_type	= ".1.3.6.1.2.1.2.2.1.3"; // take only type ethernetCsmacd(6) or propVirtual(53)
 	$snmp_is_trunk = '.1.3.6.1.4.1.9.9.46.1.6.1.1.14'; // 1 if in trunk mode
 	
+
+		$intf_type_array = cacti_snmp_walk( $hostrecord_array['hostname'], $hostrecord_array['snmp_community'], 
+		$snmp_interfaces_type, $hostrecord_array['snmp_version'] );
+//ciscotools_log('1: get itf type: '.print_r($intf_type_array, true) );
+
+//ciscotools_log('2: get trunk array');
+		// Check if it's a trunk, if so make vlan_name as trunk and id 0
+		$intf_trunk_array = cacti_snmp_walk( $hostrecord_array['hostname'], $hostrecord_array['snmp_community'], 
+		$snmp_is_trunk, $hostrecord_array['snmp_version'] );
+
 	// get mac adress
 	$cnt=0;
 	$mac_array=array();
@@ -132,46 +152,55 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 			$snmp_community = $hostrecord_array['snmp_community'].'@'.$vlan_array[$vlankey]['id'];
 		else $snmp_community = 'vlan-'.$vlan_array[$vlankey]['id'];
 		
-//ciscotools_log('get mac vlan:'.$vlan_array[$vlankey]['id']);
 		$mac_address_array = cacti_snmp_walk( $hostrecord_array['hostname'], $snmp_community, $snmp_mac_list, 
 		$hostrecord_array['snmp_version'] ); // return an array OID and MAC as human readable
+//ciscotools_log('3: mac address array: '.print_r($mac_address_array, true). ' for vlan: '.$vlan_array[$vlankey]['id']);
 
-//ciscotools_log('get bridge port global');
 		$bridge_port_array = cacti_snmp_walk( $hostrecord_array['hostname'], $snmp_community, 
 		$snmp_bridge_port_number, $hostrecord_array['snmp_version'] ); // return a value used to get index of internet interface, and oid with the mac
-//ciscotools_log('get bridge port global: '.print_r($bridge_port_array,true) );
+//ciscotools_log('4: get bridge port array: '.print_r($bridge_port_array,true). ' for vlan: '.$vlan_array[$vlankey]['id'] );
 		if( empty($bridge_port_array) ) continue; // if no bridge port, no mac, go further
 		
-//ciscotools_log('get itf index global');
 		// get interface index from bridge port for all interface in that vlan
 		$intf_index_array = cacti_snmp_walk( $hostrecord_array['hostname'], $snmp_community, 
 		$snmp_bridge_2_index, $hostrecord_array['snmp_version'] ); 
-//ciscotools_log('get itf index: '.print_r($intf_index_array, true) );
+//ciscotools_log('5: get bridge2index array: '.print_r($intf_index_array, true));
 
-		$intf_type_array = cacti_snmp_walk( $hostrecord_array['hostname'], $hostrecord_array['snmp_community'], 
-		$snmp_interfaces_type, $hostrecord_array['snmp_version'] );
-//ciscotools_log('get itf type: '.print_r($intf_type_array, true) );
-
-//ciscotools_log('get trunk array');
-		// Check if it's a trunk, if so make vlan_name as trunk and id 0
-		$intf_trunk_array = cacti_snmp_walk( $hostrecord_array['hostname'], $hostrecord_array['snmp_community'], 
-		$snmp_is_trunk, $hostrecord_array['snmp_version'] );
-//ciscotools_log('get itf trunk: '.print_r($intf_trunk_array, true) );
-
-//ciscotools_log('format mac:'.print_r($mac_address_array, true));
-		// save to the return array
+//*** save to the return array, so to the match for all MAC on a VLAN
 		// take each mac address
-		$mac_array[$cnt]['mac_adress'] = '';
+		$mac_array[$cnt]['mac_address'] = '';
 		foreach($mac_address_array as $key => $mac_address){
-			$mac_array[$cnt]['mac_adress'] = str_replace( ' ', '', $mac_address['value']); // and remove space inside
-			if( !is_string($mac_array[$cnt]['mac_adress']) ) continue; // drop record if not correct
+			// take the MAC from the OID, in decimal format
+			$regex = '~(.[0-9]{1,3}){6}$~';
+			preg_match($regex, $mac_address['oid'], $matches, PREG_OFFSET_CAPTURE, 0);
+			$mac_oid = $snmp_bridge_port_number . $matches[0][0];
+
+			$mac_array[$cnt]['mac_address'] = str_replace( ' ', '', $mac_address['value']); // and remove space inside
+			if( !is_string($mac_array[$cnt]['mac_address']) ) continue; // drop record if not correct
 			$mac_array[$cnt]['vlan_id'] = $vlan_array[$vlankey]['id'];
 			$mac_array[$cnt]['vlan_name'] = $vlan_array[$vlankey]['name'];
 
-//ciscotools_log('get itf index from array:'.$key );
 			// get interface index from bridge port
-			$bridge_index = $snmp_bridge_2_index . '.' . $bridge_port_array[$key]['value'];
-//ciscotools_log('oid:'.$bridge_index );
+			// dosen't match!! $key to big, look for mac on OID
+			// do a do-while onthe OID of the bridge_port_array to find the MAC address, then get the value to parse the bridge2index OID to get the port_index in the value
+			$mac_array[$cnt]['port_index'] = '';
+			foreach($bridge_port_array as $bridge_port ) {
+				if( $bridge_port['oid'] != $mac_oid ) continue; // Port dosen't match what we are looking for, so go to next one
+				$bridge_index = $snmp_bridge_2_index . '.' . $bridge_port['value'];
+				foreach( $intf_index_array as $bridge2index ){
+					if( $bridge2index['oid'] != $bridge_index) continue;
+					$mac_array[$cnt]['port_index'] = $bridge2index['value'];
+					break 2;
+				}
+			}
+ciscotools_log('Mac address :'.$mac_oid .' 4:bridgeport: '.print_r($bridge_port, true). ' 5:intindex: '.print_r($bridge2index, true));
+
+			unset($bridge2index); // clear the value to avoid problem
+			unset($bridge_port); // clear the value to avoid problem
+/*			
+ciscotools_log('get itf index from array:'.$key );
+			$bridge_index = $snmp_bridge_2_index . '.' . $bridge_port_array[$key]['value']; 
+ciscotools_log('get itf bridge index: '.$bridge_index );
 			$mac_array[$cnt]['port_index'] = '0'; // init a 0 value to avoid any error later
 			foreach( $intf_index_array as $bridge2index ){
 				if( $bridge2index['oid'] != $bridge_index) continue;
@@ -179,19 +208,13 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 				break;
 			}
 			unset($bridge2index); // clear the value to avoid problem
-			
-//ciscotools_log('get typefor index: '.$mac_array[$cnt]['port_index']);
-			// if interface csmacd, drop record, and continue
-
-//ciscotools_log('get itf type from array');
+*/			
 			// get interface index from bridge port
 			$type_index = $snmp_interfaces_type.'.'.$mac_array[$cnt]['port_index'];
-//ciscotools_log('type oid:'.$type_index );
 			foreach( $intf_type_array as $type4index ){
-				if( $type4index['oid'] != $type_index) continue;
+				if( $type4index['oid'] != $type_index) continue; // if interface not csmacd and not propVirtual, drop record, and continue
 				$intf_type = $type4index['value'];
-//ciscotools_log('type value:'.$intf_type );
-				if( $intf_type != 'ethernetCsmacd' ){
+				if( $intf_type != 'ethernetCsmacd' && $intf_type != 'propVirtual' ){
 					break 2;
 				}
 				break;
@@ -199,15 +222,11 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 			unset($type4index); // clear the value to avoid problem
 
 			// Check if it's a trunk, if so make vlan_name as trunk and id 0
-//ciscotools_log('get itf trunk from array');
 			$trunk_index = $snmp_is_trunk.'.'.$mac_array[$cnt]['port_index'];
-//ciscotools_log('type oid:'.$trunk_index );
 			foreach( $intf_trunk_array as $trunk4index ){
-//ciscotools_log('trunk4index oid:'.$trunk4index['oid'] );
 
 				if( $trunk4index['oid'] != $trunk_index) continue;
 				$intf_trunk = $trunk4index['value'];
-//ciscotools_log('type value:'.$intf_trunk );
 				if( $intf_trunk == '1' ) {
 					$mac_array[$cnt]['vlan_id']= '0';
 					$mac_array[$cnt]['vlan_name'] = 'trunk';
@@ -219,7 +238,7 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 			$mysql = ("INSERT INTO plugin_ciscotools_mactrack (host_id,mac_address,port_index,vlan_id,vlan_name,date) 
 				VALUES ('".
 				$hostrecord_array['id']."','".
-				$mac_array[$cnt]['mac_adress']."','".
+				$mac_array[$cnt]['mac_address']."','".
 				$mac_array[$cnt]['port_index']."','".
 				$mac_array[$cnt]['vlan_id']."','".
 				$mac_array[$cnt]['vlan_name']."','".
@@ -263,9 +282,7 @@ function get_vlan( $hostrecord_array ) {
 			break;
 			
 			default:
-			$vlan[] = array( 'id' =>  $id, 'name' => $vlan_names[$key]['value'] );
-//				$vlan[$cnt]['id'] = $id;
-//				$vlan[$cnt]['name'] = $vlan_names[$key]['value'];
+				$vlan[] = array( 'id' =>  $id, 'name' => $vlan_names[$key]['value'] );
 				$cnt++;
 			break;
 		}

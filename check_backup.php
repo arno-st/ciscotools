@@ -69,7 +69,7 @@ include_once($config['base_path'] . '/plugins/ciscotools/setup.php');
         $savedchange = db_fetch_cell("SELECT datechange FROM plugin_ciscotools_backup WHERE host_id=".$host['id']." ORDER BY version DESC LIMIT 1");
 
         if($lastchange > $savedchange || empty($savedchange) ){
-            cacti_log('Device: '.$host['description']. ' need backup '.$lastchange .' backup: '.$savedchange);
+            ciscotools_log('Device: '.$host['description']. ' need backup '.$lastchange .' backup: '.$savedchange);
             ciscotools_backup($host['id'], false, 'CISCOTOOLS');
         } else ciscotools_log('Device: '.$host['description']. ' no diff since last backup');
     }
