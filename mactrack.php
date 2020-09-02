@@ -23,6 +23,7 @@
 */
 
 include_once($config['base_path'] . '/plugins/extenddb/ssh2.php');
+include_once($config['base_path'] . '/plugins/ciscotools/ciscowificontroler.php');
 $snmp_bridge = "1.3.6.1.2.1.17.4.4"; // where you can find info on mac table
 
 $snmp_bridge_pot2int	= ".1.3.6.1.2.1.17.1.4.1.2"; // Attention mettre @vlan_ids apres la coummunity, snmpwalk
@@ -35,6 +36,17 @@ $snmp_interfaces_hightSpeed	= ".1.3.6.1.2.1.31.1.1.1.15";
 $snmp_interfaces_descr	= ".1.3.6.1.2.1.2.2.1.2";
 $snmp_interfaces_adminstatus = ".1.3.6.1.2.1.2.2.1.7";
 $snmp_interfaces_operstatus = ".1.3.6.1.2.1.2.2.1.8";
+
+/* WiFi controler don't answer to vlan query
+ it only answer to snmpquery :
+Client IP address list			1.3.6.1.4.1.14179.2.1.4.1.2
+SNMPv2-SMI::enterprises.14179.2.1.4.1.2.0.22.127.44.103.58 = IpAddress: 10.95.79.251
+Client Mac address list			1.3.6.1.4.1.14179.2.1.4.1.4
+SNMPv2-SMI::enterprises.14179.2.1.4.1.4.0.22.127.44.103.58 = Hex-STRING: 78 0C F0 CE 60 E0 
+Client SSID list				1.3.6.1.4.1.14179.2.1.4.1.7
+SNMPv2-SMI::enterprises.14179.2.1.4.1.7.0.22.127.44.103.58 = STRING: "DATAS"
+
+*/
 
 function purge_mac(){
 	$datetopurge = date('YmdHis',strtotime(read_config_option('ciscotools_mac_data_retention')) );
@@ -55,18 +67,29 @@ function purge_mac(){
 
 function get_mac_table($hostrecord_array) {
 	ciscotools_log('Pool mac for host:'.$hostrecord_array['description']);
-	// host_id is given by the call on this function, on the array $hostrecord_array
-	// first pool vlan on device: here you got vlan_id and name
-	// second pool mac on each vlan of device: here you add mac address
-	// then merge mac, interface data, vlan, device
-	// finaly do reverse lookup on ip to have description
-	$vlan_array = get_vlan( $hostrecord_array );
-
-	if ( !empty($vlan_array) ) {
-		$mac_array = get_mac_vlan( $hostrecord_array, $vlan_array );
-
-		if ( !empty($mac_array) )
-			get_ip_4_mac( $hostrecord_array, $mac_array);
+	// make a test if it's a device like WiFi controler (snmp_sysObjectID=iso.3.6.1.4.1.9.1.1069) call another set of function.
+	// spécial php code is used for that
+	
+	switch( $hostrecord_array['snmp_sysObjectID'] ) {
+		case 'iso.3.6.1.4.1.9.1.1069':
+			get_wifi_mac_table($hostrecord_array);
+		break;
+		
+		default:
+			// host_id is given by the call on this function, on the array $hostrecord_array
+			// first pool vlan on device: here you got vlan_id and name
+			// second pool mac on each vlan of device: here you add mac address
+			// then merge mac, interface data, vlan, device
+			// finaly do reverse lookup on ip to have description
+			$vlan_array = get_vlan( $hostrecord_array );
+			
+			if ( !empty($vlan_array) ) {
+				$mac_array = get_mac_vlan( $hostrecord_array, $vlan_array );
+			
+				if ( !empty($mac_array) )
+					get_ip_4_mac( $hostrecord_array, $mac_array);
+			}
+		break;
 	}
 }
 
@@ -134,14 +157,14 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 	$snmp_is_trunk = '.1.3.6.1.4.1.9.9.46.1.6.1.1.14'; // 1 if in trunk mode
 	
 
-		$intf_type_array = cacti_snmp_walk( $hostrecord_array['hostname'], $hostrecord_array['snmp_community'], 
-		$snmp_interfaces_type, $hostrecord_array['snmp_version'] );
+	$intf_type_array = cacti_snmp_walk( $hostrecord_array['hostname'], $hostrecord_array['snmp_community'], 
+	$snmp_interfaces_type, $hostrecord_array['snmp_version'] );
 //ciscotools_log('1: get itf type: '.print_r($intf_type_array, true) );
 
 //ciscotools_log('2: get trunk array');
-		// Check if it's a trunk, if so make vlan_name as trunk and id 0
-		$intf_trunk_array = cacti_snmp_walk( $hostrecord_array['hostname'], $hostrecord_array['snmp_community'], 
-		$snmp_is_trunk, $hostrecord_array['snmp_version'] );
+	// Check if it's a trunk, if so make vlan_name as trunk and id 0
+	$intf_trunk_array = cacti_snmp_walk( $hostrecord_array['hostname'], $hostrecord_array['snmp_community'], 
+	$snmp_is_trunk, $hostrecord_array['snmp_version'] );
 
 	// get mac adress
 	$cnt=0;
@@ -193,22 +216,10 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 					break 2;
 				}
 			}
-ciscotools_log('Mac address :'.$mac_oid .' 4:bridgeport: '.print_r($bridge_port, true). ' 5:intindex: '.print_r($bridge2index, true));
+//ciscotools_log('Mac address :'.$mac_oid .' 4:bridgeport: '.print_r($bridge_port, true). ' 5:intindex: '.print_r($bridge2index, true));
 
 			unset($bridge2index); // clear the value to avoid problem
 			unset($bridge_port); // clear the value to avoid problem
-/*			
-ciscotools_log('get itf index from array:'.$key );
-			$bridge_index = $snmp_bridge_2_index . '.' . $bridge_port_array[$key]['value']; 
-ciscotools_log('get itf bridge index: '.$bridge_index );
-			$mac_array[$cnt]['port_index'] = '0'; // init a 0 value to avoid any error later
-			foreach( $intf_index_array as $bridge2index ){
-				if( $bridge2index['oid'] != $bridge_index) continue;
-				$mac_array[$cnt]['port_index'] = $bridge2index['value'];
-				break;
-			}
-			unset($bridge2index); // clear the value to avoid problem
-*/			
 			// get interface index from bridge port
 			$type_index = $snmp_interfaces_type.'.'.$mac_array[$cnt]['port_index'];
 			foreach( $intf_type_array as $type4index ){

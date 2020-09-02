@@ -120,7 +120,7 @@ table plugin_ciscotools_mactrack
 			WHERE mac.host_id = host.id
 			".$sql_where;
 	
-	$total_rows = db_fetch_cell( $sql_total_row);
+	$total_rows = db_fetch_cell( $sql_total_row );
 			
 	/* if the number of rows is -1, set it to the default */
 	if (get_request_var("rows") == "-1") {
@@ -138,14 +138,21 @@ table plugin_ciscotools_mactrack
 			FROM plugin_ciscotools_mactrack as mac 
 			INNER JOIN host ON host.id=mac.host_id
 			INNER JOIN host_snmp_cache as intf ON mac.host_id=intf.host_id
-			WHERE intf.field_name='ifDescr'
-			AND mac.port_index=intf.snmp_index
+			WHERE mac.port_index=intf.snmp_index
+			AND IF( intf.field_name IS NULL, intf.field_name='ifDescr', intf.field_name='wlcssidname')
 			$sql_where
 			ORDER BY ".$sort_column." ".$sort_direction." 
 			LIMIT " . $sql_limit;
 
 	$result = db_fetch_assoc($sql_query); // query result is one entry par backup
-
+// add MAC vendor information from :
+/*
+{"oui":"98:74:DA","isPrivate":false,"companyName":"Infinix mobility Ltd","companyAddress":"RMS 05-15, 13A/F SOUTH TOWER WORLD FINANCE CTR HARBOUR CITY 17 CANTON RD TST KLN HONG KONG HongKong HongKong 999077 HK","countryCode":"HK","assignmentBlockSize":"MA-L","dateCreated":"2017-02-21","dateUpdated":"2017-02-21"}
+*/
+	$json_data = file_get_contents($config['base_path'] . '/plugins/ciscotools/macaddress.io-db.json');
+	$mac_vendor = json_decode($json_data, true);
+	ciscotools_log('mac_vendor data:'.print_r($mac_vendor,true) );
+	ciscotools_log('json error'.json_last_error_msg () );
 // build the page
 	?>
 	
@@ -256,7 +263,7 @@ table plugin_ciscotools_mactrack
 		"vlan_id" => array("Vlan ID", "ASC"),
 		"switch" => array("Switch name", "ASC"),
 		"intf_name" => array("Interface Name", "ASC"),
-		"id" => array("Switch ID", "ASC"),
+		"mac_vendor" => array("MAC Vendor", "ASC"),
 		"nosort" => array("", ""));
 	
 /* html_header_sort - draws a header row suitable for display inside of a box element.  When
