@@ -31,3 +31,4 @@
 1.1.0 Added the functionality of doing an upgrade of the switch, and the upload of new IOS based a snmpSysObjId via tftp or snmp
 1.2.0 Added the MacTrack function
 1.2.1 Added sort function to display_backup
+1.2.2 Added MAC OUI database

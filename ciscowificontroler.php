@@ -52,37 +52,83 @@ function get_wifi_mac_table($hostrecord_array) {
 
 	// get full MAC table on device
 	$arp_table_array = cacti_snmp_walk( $hostrecord_array['hostname'], $hostrecord_array['snmp_community'], $snmp_client_mac, 
-	$hostrecord_array['snmp_version'] ); // return OID with MAC and HEX MAC as value
+	$hostrecord_array['snmp_version'],
+	$hostrecord_array['snmp_username'],
+	$hostrecord_array['snmp_password'],
+	$hostrecord_array['snmp_auth_protocol'],
+	$hostrecord_array['snmp_priv_passphrase'],
+	$hostrecord_array['snmp_priv_protocol']
+ ); // return OID with MAC and HEX MAC as value
 //ciscotools_log('1: get MAC table array' . print_r( $arp_table_array ,true) );
+	if( empty($arp_table_array) ){
+		cacti_log('no mac on: '.$hostrecord_array['description'], false, 'CISCOTOOLS' );
+		return; // if no mac don't go durther
+	}
 
 	// get full ip table on device
 	$ip_table_array = cacti_snmp_walk( $hostrecord_array['hostname'], $hostrecord_array['snmp_community'], $snmp_client_ip, 
-	$hostrecord_array['snmp_version'] ); // return OID with MAC and IP as value
+	$hostrecord_array['snmp_version'],
+	$hostrecord_array['snmp_username'],
+	$hostrecord_array['snmp_password'],
+	$hostrecord_array['snmp_auth_protocol'],
+	$hostrecord_array['snmp_priv_passphrase'],
+	$hostrecord_array['snmp_priv_protocol']
+ ); // return OID with MAC and IP as value
 //ciscotools_log('2: get IP table array' . print_r( $ip_table_array, true) );
 
 	// get full SSID table on device
 	$ssid_table_array = cacti_snmp_walk( $hostrecord_array['hostname'], $hostrecord_array['snmp_community'], $snmp_client_ssid, 
-	$hostrecord_array['snmp_version'] ); // return OID with MAC and SSID as value
+	$hostrecord_array['snmp_version'],
+	$hostrecord_array['snmp_username'],
+	$hostrecord_array['snmp_password'],
+	$hostrecord_array['snmp_auth_protocol'],
+	$hostrecord_array['snmp_priv_passphrase'],
+	$hostrecord_array['snmp_priv_protocol']
+ ); // return OID with MAC and SSID as value
 //ciscotools_log('3: get SSID table array' . print_r( $ssid_table_array ,true) );
 
 	// get full hostname table on device
 	$hostname_table_array = cacti_snmp_walk( $hostrecord_array['hostname'], $hostrecord_array['snmp_community'], $snmp_client_name, 
-	$hostrecord_array['snmp_version'] ); // return OID with MAC and SSID as value
+	$hostrecord_array['snmp_version'],
+	$hostrecord_array['snmp_username'],
+	$hostrecord_array['snmp_password'],
+	$hostrecord_array['snmp_auth_protocol'],
+	$hostrecord_array['snmp_priv_passphrase'],
+	$hostrecord_array['snmp_priv_protocol']
+ ); // return OID with MAC and SSID as value
 //ciscotools_log('4: get hostname table array' . print_r( $hostname_table_array ,true) );
 
 	// get full vlan id table on device
 	$vlan_id_table_array = cacti_snmp_walk( $hostrecord_array['hostname'], $hostrecord_array['snmp_community'], $snmp_client_vlan_id, 
-	$hostrecord_array['snmp_version'] ); // return OID with MAC and vlan id as value
+	$hostrecord_array['snmp_version'],
+	$hostrecord_array['snmp_username'],
+	$hostrecord_array['snmp_password'],
+	$hostrecord_array['snmp_auth_protocol'],
+	$hostrecord_array['snmp_priv_passphrase'],
+	$hostrecord_array['snmp_priv_protocol']
+ ); // return OID with MAC and vlan id as value
 //ciscotools_log('5: get vlan id table array' . print_r( $vlan_id_table_array ,true) );
 
 	// get full vlan name table on device
 	$vlan_name_table_array = cacti_snmp_walk( $hostrecord_array['hostname'], $hostrecord_array['snmp_community'], $snmp_client_vlan_name, 
-	$hostrecord_array['snmp_version'] ); // return OID with MAC and lvan name as value
+	$hostrecord_array['snmp_version'],
+	$hostrecord_array['snmp_username'],
+	$hostrecord_array['snmp_password'],
+	$hostrecord_array['snmp_auth_protocol'],
+	$hostrecord_array['snmp_priv_passphrase'],
+	$hostrecord_array['snmp_priv_protocol']
+ ); // return OID with MAC and lvan name as value
 //ciscotools_log('6: get vlan name table array' . print_r( $vlan_name_table_array ,true) );
 
 	// get full SSID name table on device
 	$ssid_controler_table_array = cacti_snmp_walk( $hostrecord_array['hostname'], $hostrecord_array['snmp_community'], $snmp_controler_ssid_name, 
-	$hostrecord_array['snmp_version'] ); // return OID with index and name
+	$hostrecord_array['snmp_version'],
+	$hostrecord_array['snmp_username'],
+	$hostrecord_array['snmp_password'],
+	$hostrecord_array['snmp_auth_protocol'],
+	$hostrecord_array['snmp_priv_passphrase'],
+	$hostrecord_array['snmp_priv_protocol']
+ ); // return OID with index and name
 //ciscotools_log('7: get SSID controler name table array' . print_r( $ssid_controler_table_array ,true) );
 
 	$cnt = 0; // init the table count to store all info later
@@ -136,7 +182,7 @@ function get_wifi_mac_table($hostrecord_array) {
 			$mac_array[$cnt]['vlan_id'] = $vlan_id['value']; // store VLAN ID from value
 			break; // find so exit
 		}
-		// parse for port index, based on vlan(ssid) name and moatch by name
+		// parse for port index, based on vlan(ssid) name and match by name, somehow try to find the AP 
 		foreach( $ssid_controler_table_array as $ssid_name) {
 			$regex = '~([0-9]+$)~';
 			preg_match($regex, $ssid_name['oid'], $matches, PREG_OFFSET_CAPTURE, 0);

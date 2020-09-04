@@ -99,7 +99,13 @@ function get_ip_4_mac( $hostrecord_array, $mac_array) {
 
 	// get full arp table on device
 	$arp_table_array = cacti_snmp_walk( $hostrecord_array['hostname'], $hostrecord_array['snmp_community'], $snmp_get_ip, 
-	$hostrecord_array['snmp_version'] ); // return OID with IP and MAC as value
+	$hostrecord_array['snmp_version'],
+	$hostrecord_array['snmp_username'],
+	$hostrecord_array['snmp_password'],
+	$hostrecord_array['snmp_auth_protocol'],
+	$hostrecord_array['snmp_priv_passphrase'],
+	$hostrecord_array['snmp_priv_protocol']
+	); // return OID with IP and MAC as value
 	
 	//parse each line to extract IP, and match mac array
 	$regex = '~\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$~';
@@ -158,13 +164,25 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 	
 
 	$intf_type_array = cacti_snmp_walk( $hostrecord_array['hostname'], $hostrecord_array['snmp_community'], 
-	$snmp_interfaces_type, $hostrecord_array['snmp_version'] );
+	$snmp_interfaces_type, $hostrecord_array['snmp_version'],
+	$hostrecord_array['snmp_username'],
+	$hostrecord_array['snmp_password'],
+	$hostrecord_array['snmp_auth_protocol'],
+	$hostrecord_array['snmp_priv_passphrase'],
+	$hostrecord_array['snmp_priv_protocol']
+	);
 //ciscotools_log('1: get itf type: '.print_r($intf_type_array, true) );
 
 //ciscotools_log('2: get trunk array');
 	// Check if it's a trunk, if so make vlan_name as trunk and id 0
 	$intf_trunk_array = cacti_snmp_walk( $hostrecord_array['hostname'], $hostrecord_array['snmp_community'], 
-	$snmp_is_trunk, $hostrecord_array['snmp_version'] );
+	$snmp_is_trunk, $hostrecord_array['snmp_version'],
+	$hostrecord_array['snmp_username'],
+	$hostrecord_array['snmp_password'],
+	$hostrecord_array['snmp_auth_protocol'],
+	$hostrecord_array['snmp_priv_passphrase'],
+	$hostrecord_array['snmp_priv_protocol']
+ );
 
 	// get mac adress
 	$cnt=0;
@@ -176,17 +194,35 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 		else $snmp_community = 'vlan-'.$vlan_array[$vlankey]['id'];
 		
 		$mac_address_array = cacti_snmp_walk( $hostrecord_array['hostname'], $snmp_community, $snmp_mac_list, 
-		$hostrecord_array['snmp_version'] ); // return an array OID and MAC as human readable
+		$hostrecord_array['snmp_version'],
+	$hostrecord_array['snmp_username'],
+	$hostrecord_array['snmp_password'],
+	$hostrecord_array['snmp_auth_protocol'],
+	$hostrecord_array['snmp_priv_passphrase'],
+	$hostrecord_array['snmp_priv_protocol']
+ ); // return an array OID and MAC as human readable
 //ciscotools_log('3: mac address array: '.print_r($mac_address_array, true). ' for vlan: '.$vlan_array[$vlankey]['id']);
 
 		$bridge_port_array = cacti_snmp_walk( $hostrecord_array['hostname'], $snmp_community, 
-		$snmp_bridge_port_number, $hostrecord_array['snmp_version'] ); // return a value used to get index of internet interface, and oid with the mac
+		$snmp_bridge_port_number, $hostrecord_array['snmp_version'],
+	$hostrecord_array['snmp_username'],
+	$hostrecord_array['snmp_password'],
+	$hostrecord_array['snmp_auth_protocol'],
+	$hostrecord_array['snmp_priv_passphrase'],
+	$hostrecord_array['snmp_priv_protocol']
+ ); // return a value used to get index of internet interface, and oid with the mac
 //ciscotools_log('4: get bridge port array: '.print_r($bridge_port_array,true). ' for vlan: '.$vlan_array[$vlankey]['id'] );
 		if( empty($bridge_port_array) ) continue; // if no bridge port, no mac, go further
 		
 		// get interface index from bridge port for all interface in that vlan
 		$intf_index_array = cacti_snmp_walk( $hostrecord_array['hostname'], $snmp_community, 
-		$snmp_bridge_2_index, $hostrecord_array['snmp_version'] ); 
+		$snmp_bridge_2_index, $hostrecord_array['snmp_version'],
+	$hostrecord_array['snmp_username'],
+	$hostrecord_array['snmp_password'],
+	$hostrecord_array['snmp_auth_protocol'],
+	$hostrecord_array['snmp_priv_passphrase'],
+	$hostrecord_array['snmp_priv_protocol']
+ ); 
 //ciscotools_log('5: get bridge2index array: '.print_r($intf_index_array, true));
 
 //*** save to the return array, so to the match for all MAC on a VLAN
@@ -274,10 +310,22 @@ function get_vlan( $hostrecord_array ) {
 	$snmp_vlan_nbport_using = ".1.3.6.1.2.1.17.1.2.0"; // Attention mettre @vlan_ids après la coummunity, snmpget
 
 	$vlan_ids = cacti_snmp_walk( $hostrecord_array['hostname'], $hostrecord_array['snmp_community'], $snmp_vlan_ids, 
-	$hostrecord_array['snmp_version'] ); // return an array of array containing OID, vlan id
+	$hostrecord_array['snmp_version'],
+	$hostrecord_array['snmp_username'],
+	$hostrecord_array['snmp_password'],
+	$hostrecord_array['snmp_auth_protocol'],
+	$hostrecord_array['snmp_priv_passphrase'],
+	$hostrecord_array['snmp_priv_protocol']
+ ); // return an array of array containing OID, vlan id
 
 	$vlan_names = cacti_snmp_walk( $hostrecord_array['hostname'], $hostrecord_array['snmp_community'], $snmp_vlan_names, 
-	$hostrecord_array['snmp_version'] ); // return an array of array containing OID, vlan name
+	$hostrecord_array['snmp_version'],
+	$hostrecord_array['snmp_username'],
+	$hostrecord_array['snmp_password'],
+	$hostrecord_array['snmp_auth_protocol'],
+	$hostrecord_array['snmp_priv_passphrase'],
+	$hostrecord_array['snmp_priv_protocol']
+ ); // return an array of array containing OID, vlan name
 
 	$cnt=0;
 	$vlan=array();

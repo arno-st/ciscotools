@@ -57,7 +57,7 @@ function ciscotools_displaymac() {
 			'pageset' => true,
 			'default' => ''
 			),
-		'no_trunk' => array(
+		'trunk' => array(
 			'filter' => FILTER_VALIDATE_BOOLEAN,
 			'pageset' => true,
 			'default' => '0'
@@ -92,7 +92,7 @@ table plugin_ciscotools_mactrack
 	$mac_address       = str_replace(array(':','-','.'), '', get_request_var_request("mac_address"));
 	$ip_address       = get_request_var_request("ip_address");
 	$description       = get_request_var_request("description");
-	$no_trunk       = get_request_var_request("no_trunk");
+	$trunk       = get_request_var_request("trunk");
 	
 	if ($switch != '') {
 		$sql_where .= " AND " . "host.description LIKE '%$switch%'";
@@ -106,18 +106,22 @@ table plugin_ciscotools_mactrack
 	if ($description != '') {
 		$sql_where .= " AND " . "mac.description LIKE '%$description%'";
 	}
-	if ($no_trunk == '1') {
-		$sql_where .= " AND " . "mac.vlan_id != '0'";
+	if ($trunk == '1') {
+		$sql_where .= " AND " . "mac.vlan_id = '0'";
 	} else {
-		unset_request_var('no_trunk');
-		$no_trunk = '0';
+		unset_request_var('trunk');
+		$trunk = '0';
+		$sql_where .= " AND " . "mac.vlan_id != '0'";
 	}
 
 	general_header();
 	// how many record we have
 	$sql_total_row = "SELECT count(mac.id)
-			FROM plugin_ciscotools_mactrack as mac, host
-			WHERE mac.host_id = host.id
+			FROM plugin_ciscotools_mactrack as mac 
+			INNER JOIN host ON host.id=mac.host_id
+			INNER JOIN host_snmp_cache as intf ON mac.host_id=intf.host_id
+			WHERE mac.port_index=intf.snmp_index
+			AND intf.field_name='ifDescr'
 			".$sql_where;
 	
 	$total_rows = db_fetch_cell( $sql_total_row );
@@ -139,20 +143,20 @@ table plugin_ciscotools_mactrack
 			INNER JOIN host ON host.id=mac.host_id
 			INNER JOIN host_snmp_cache as intf ON mac.host_id=intf.host_id
 			WHERE mac.port_index=intf.snmp_index
-			AND IF( intf.field_name IS NULL, intf.field_name='ifDescr', intf.field_name='wlcssidname')
+			AND intf.field_name='ifDescr'
 			$sql_where
 			ORDER BY ".$sort_column." ".$sort_direction." 
 			LIMIT " . $sql_limit;
 
 	$result = db_fetch_assoc($sql_query); // query result is one entry par backup
+	ciscotools_log('db query: '. $sql_query . ' ('.count($result).')' );
 // add MAC vendor information from :
 /*
 {"oui":"98:74:DA","isPrivate":false,"companyName":"Infinix mobility Ltd","companyAddress":"RMS 05-15, 13A/F SOUTH TOWER WORLD FINANCE CTR HARBOUR CITY 17 CANTON RD TST KLN HONG KONG HongKong HongKong 999077 HK","countryCode":"HK","assignmentBlockSize":"MA-L","dateCreated":"2017-02-21","dateUpdated":"2017-02-21"}
 */
-	$json_data = file_get_contents($config['base_path'] . '/plugins/ciscotools/macaddress.io-db.json');
-	$mac_vendor = json_decode($json_data, true);
-	ciscotools_log('mac_vendor data:'.print_r($mac_vendor,true) );
-	ciscotools_log('json error'.json_last_error_msg () );
+	
+	$json_data_file = file_get_contents($config['base_path'] . '/plugins/ciscotools/macaddress.io-db.json'); // one file with many line, need to read one at time
+//	$mac_vendor = json_decode($json_data, true );
 // build the page
 	?>
 	
@@ -165,7 +169,7 @@ table plugin_ciscotools_mactrack
 		strURL += '&ip_address=' + $('#ip_address').val();
 		strURL += '&mac_address=' + $('#mac_address').val();
 		strURL += '&description=' + $('#description').val();
-		strURL += '&no_trunk=' + $('#no_trunk').val();
+		strURL += '&trunk=' + $('#trunk').val();
 		strURL += '&rows=' + $('#rows').val();
 		
 		loadPageNoHeader(strURL);
@@ -215,10 +219,10 @@ table plugin_ciscotools_mactrack
 					</td>
 					<td nowrap style='white-space: nowrap;' width="1">
 				<td nowrap style='white-space: nowrap;' width="1">
-					&nbsp;Remove Trunk:&nbsp;
+					&nbsp;Display Trunk:&nbsp;
 				</td>
 				<td width="1">
-					<input type="checkbox" name="no_trunk" value="1" <?php ($no_trunk=='1')?print " checked":print "" ?>>
+					<input type="checkbox" name="trunk" value="1" <?php ($trunk=='1')?print " checked":print "" ?>>
 				</td>
 				<td nowrap style='white-space: nowrap;' width="1">
 					&nbsp;Rows:&nbsp;
@@ -295,7 +299,7 @@ table plugin_ciscotools_mactrack
 							. $row['description'] . '</td>
 							<td>' . $row['mac'] . '</td>
 							<td>' . $row['ip'] . '</td>
-							<td>' . $row['date'] . '</td>
+							<td>' . date("Y/m/d H:i:s", strtotime($row['date']) ) . '</td>
 							<td>' . $row['vlan_name'] . '</td>
 							<td>' . $row['vlan_id'] . '</td>
 							<td>' . $row['switch'] . '</td>

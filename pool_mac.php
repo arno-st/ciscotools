@@ -55,9 +55,9 @@ if(empty($nb_process)) $nb_process=2; // just in case the configuration is not s
     If we don't force by default the polling, we do it only on enabled device
     */
     if( read_config_option('ciscotools_default_keep_mac_track') == 'on') { 
-        $sqlqueryfilter = "keep_mac_track!='off' AND snmp_sysObjectID LIKE 'iso.3.6.1.4.1.9%' AND disabled !='on' AND status ='3'"; 
+        $sqlqueryfilter = "snmp_sysObjectID LIKE 'iso.3.6.1.4.1.9.%' AND disabled !='on' AND status ='3'"; 
     } else {
-        $sqlqueryfilter = "keep_mac_track='on' AND snmp_sysObjectID LIKE 'iso.3.6.1.4.1.9%' AND disabled !='on' AND status ='3'";
+        $sqlqueryfilter = "keep_mac_track='on' AND snmp_sysObjectID LIKE 'iso.3.6.1.4.1.9.%' AND disabled !='on' AND status ='3'";
     }
     $dbquery = db_fetch_assoc("SELECT * FROM host WHERE ".$sqlqueryfilter );
     if( $dbquery === false ){
