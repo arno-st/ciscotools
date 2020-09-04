@@ -120,10 +120,11 @@ table plugin_ciscotools_mactrack
 			FROM plugin_ciscotools_mactrack as mac 
 			INNER JOIN host ON host.id=mac.host_id
 			INNER JOIN host_snmp_cache as intf ON mac.host_id=intf.host_id
+            INNER JOIN plugin_ciscotools_oui as oui ON SUBSTRING(mac.mac_address, 1, 6)=oui.oui
 			WHERE mac.port_index=intf.snmp_index
 			AND intf.field_name='ifDescr'
 			".$sql_where;
-	
+ciscotools_log('sql query: '.$sql_total_row);	
 	$total_rows = db_fetch_cell( $sql_total_row );
 			
 	/* if the number of rows is -1, set it to the default */
@@ -138,18 +139,20 @@ table plugin_ciscotools_mactrack
 	$sql_query = "SELECT host.id as 'id', 
 			host.description as 'switch', 
 			mac.mac_address as 'mac', mac.ip_address as 'ip', mac.vlan_name as 'vlan_name', mac.vlan_id as 'vlan_id', 
-			mac.port_index as 'intf_index', mac.description as 'description', intf.field_value as 'intf_name', mac.date as 'date'
+			mac.port_index as 'intf_index', mac.description as 'description', intf.field_value as 'intf_name', 
+			mac.date as 'date', oui.companyname as 'oui'
 			FROM plugin_ciscotools_mactrack as mac 
 			INNER JOIN host ON host.id=mac.host_id
 			INNER JOIN host_snmp_cache as intf ON mac.host_id=intf.host_id
+            INNER JOIN plugin_ciscotools_oui as oui ON SUBSTRING(mac.mac_address, 1, 6)=oui.oui
 			WHERE mac.port_index=intf.snmp_index
 			AND intf.field_name='ifDescr'
 			$sql_where
 			ORDER BY ".$sort_column." ".$sort_direction." 
 			LIMIT " . $sql_limit;
-
+ciscotools_log('sql query: '.$sql_query);
 	$result = db_fetch_assoc($sql_query); // query result is one entry par backup
-	ciscotools_log('db query: '. $sql_query . ' ('.count($result).')' );
+
 	?>
 	
 	<script type="text/javascript">
@@ -296,7 +299,8 @@ table plugin_ciscotools_mactrack
 							<td>' . $row['vlan_id'] . '</td>
 							<td>' . $row['switch'] . '</td>
 							<td>' . $row['intf_name'] . '</td>
-							<td>' . substr($row['mac'], 0, 2).':'.substr($row['mac'],2,2).':'.substr($row['mac'],4, 2) . '</td>';
+							<td>' . $row['oui'] . '</td>';
+
 					print "</tr>";
 		}
 	}else{

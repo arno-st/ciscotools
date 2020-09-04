@@ -161,7 +161,8 @@ function ciscotools_check_upgrade() {
 					if( strlen($json_data) <= 1 ) continue;
 					$mac_vendor = json_decode($json_data, true );
 					$mac_vendor['companyName'] = str_replace ("'", " ", $mac_vendor['companyName']);
-					$sqlexec = "INSERT INTO plugin_ciscotools_oid (`oui`, `companyname`, `countrycode`) VALUE 
+					$mac_vendor['oui'] = str_replace (":", "", $mac_vendor['oui'] ); // remove the :
+					$sqlexec = "INSERT INTO plugin_ciscotools_oui (`oui`, `companyname`, `countrycode`) VALUE 
 					('".$mac_vendor['oui']."', '".$mac_vendor['companyName']."', '".$mac_vendor['countryCode']."')
 					ON DUPLICATE KEY UPDATE 
 					oui='".$mac_vendor['oui']."',
@@ -230,7 +231,6 @@ function ciscotools_setup_tables() {
 	$data['comment'] = 'Plugin ciscotoole - Table for MacTrack information';
 	$data['unique_keys'][] = array('name' => 'record', 'columns' => 'host_id,mac_address,port_index' );
 	api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_mactrack', $data);
-	//ALTER TABLE `plugin_ciscotools_mactrack` ADD UNIQUE( `host_id`, `mac_address`, `port_index`); 
 	// add mac info into the host table
 	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'keep_mac_track', 'type' => 'varchar(2)', 'NULL' => true, 'default' => ''));
 
@@ -248,8 +248,8 @@ function ciscotools_setup_tables() {
 	$data['keys'][] = array('name' => 'id', 'columns' => 'id');
 	$data['unique_keys'][] = array('name' => 'oui', 'columns' => 'oui' );
 	$data['type'] = 'InnoDB';
-	$data['comment'] = 'Plugin ciscotoole - Table for OID MAC information';
-	api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_oid', $data);
+	$data['comment'] = 'Plugin ciscotoole - Table for OUI MAC information';
+	api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_oui', $data);
 }
 
 function plugin_ciscotools_version () {
