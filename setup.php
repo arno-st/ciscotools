@@ -81,6 +81,9 @@ function ciscotools_check_upgrade() {
 	$version = plugin_ciscotools_version ();
 	$current = $version['version'];
 	$old     = read_config_option('plugin_ciscotools_version');
+
+	ciscotools_setup_tables();
+
 	if ($current != $old) {
 		
 		// Set the new version
@@ -147,9 +150,29 @@ function ciscotools_check_upgrade() {
             );
 		}
 		if( $old < '1.2.2' ) {
+// add MAC vendor information from :
+/*
+{"oui":"98:74:DA","isPrivate":false,"companyName":"Infinix mobility Ltd","companyAddress":"RMS 05-15, 13A/F SOUTH TOWER WORLD FINANCE CTR HARBOUR CITY 17 CANTON RD TST KLN HONG KONG HongKong HongKong 999077 HK","countryCode":"HK","assignmentBlockSize":"MA-L","dateCreated":"2017-02-21","dateUpdated":"2017-02-21"}
+*/
+			$fp = fopen($config['base_path'] . '/plugins/ciscotools/macaddress.io-db.json', "r");
+			if( $fp !== false ) {
+				do {
+					$json_data = fgets($fp);
+					if( strlen($json_data) <= 1 ) continue;
+					$mac_vendor = json_decode($json_data, true );
+					$mac_vendor['companyName'] = str_replace ("'", " ", $mac_vendor['companyName']);
+					$sqlexec = "INSERT INTO plugin_ciscotools_oid (`oui`, `companyname`, `countrycode`) VALUE 
+					('".$mac_vendor['oui']."', '".$mac_vendor['companyName']."', '".$mac_vendor['countryCode']."')
+					ON DUPLICATE KEY UPDATE 
+					oui='".$mac_vendor['oui']."',
+					companyname='".$mac_vendor['companyName']."',
+					countrycode='".$mac_vendor['countryCode']."'";
+
+					db_execute($sqlexec);
+				} while( !feof($fp) );
+			}
 		}
 	}
-	ciscotools_setup_tables();
 
 	// if mac running is on change for a number to know how many process are running
 	if( read_config_option('ciscotools_mac_running') == 'off' ) set_config_option('ciscotools_mac_running', '0');
@@ -205,11 +228,28 @@ function ciscotools_setup_tables() {
 	$data['keys'][] = array('name' => 'description', 'columns' => 'description');
 	$data['type'] = 'InnoDB';
 	$data['comment'] = 'Plugin ciscotoole - Table for MacTrack information';
+	$data['unique_keys'][] = array('name' => 'record', 'columns' => 'host_id,mac_address,port_index' );
 	api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_mactrack', $data);
-	db_add_index('plugin_ciscotools_mactrack', 'UNIQUE', 'record', array('host_id','mac_address','port_index') );
 	//ALTER TABLE `plugin_ciscotools_mactrack` ADD UNIQUE( `host_id`, `mac_address`, `port_index`); 
 	// add mac info into the host table
 	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'keep_mac_track', 'type' => 'varchar(2)', 'NULL' => true, 'default' => ''));
+
+/* table to keep OID information */
+/*
+{"oui":"98:74:DA","isPrivate":false,"companyName":"Infinix mobility Ltd","companyAddress":"RMS 05-15, 13A/F SOUTH TOWER WORLD FINANCE CTR HARBOUR CITY 17 CANTON RD TST KLN HONG KONG HongKong HongKong 999077 HK","countryCode":"HK","assignmentBlockSize":"MA-L","dateCreated":"2017-02-21","dateUpdated":"2017-02-21"}
+*/
+
+	$data = array();
+	$data['columns'][] = array('name' => 'id', 'type' => 'mediumint(8)', 'auto_increment'=>'');
+	$data['columns'][] = array('name' => 'oui', 'type' => 'varchar(8)', 'NULL' => false, 'unique_keys' =>'' );
+	$data['columns'][] = array('name' => 'companyname', 'type' => 'varchar(255)', 'NULL' => false );
+	$data['columns'][] = array('name' => 'countryCode', 'type' => 'varchar(4)', 'NULL' => false);
+	$data['primary'] = 'id';
+	$data['keys'][] = array('name' => 'id', 'columns' => 'id');
+	$data['unique_keys'][] = array('name' => 'oui', 'columns' => 'oui' );
+	$data['type'] = 'InnoDB';
+	$data['comment'] = 'Plugin ciscotoole - Table for OID MAC information';
+	api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_oid', $data);
 }
 
 function plugin_ciscotools_version () {

@@ -150,14 +150,6 @@ table plugin_ciscotools_mactrack
 
 	$result = db_fetch_assoc($sql_query); // query result is one entry par backup
 	ciscotools_log('db query: '. $sql_query . ' ('.count($result).')' );
-// add MAC vendor information from :
-/*
-{"oui":"98:74:DA","isPrivate":false,"companyName":"Infinix mobility Ltd","companyAddress":"RMS 05-15, 13A/F SOUTH TOWER WORLD FINANCE CTR HARBOUR CITY 17 CANTON RD TST KLN HONG KONG HongKong HongKong 999077 HK","countryCode":"HK","assignmentBlockSize":"MA-L","dateCreated":"2017-02-21","dateUpdated":"2017-02-21"}
-*/
-	
-	$json_data_file = file_get_contents($config['base_path'] . '/plugins/ciscotools/macaddress.io-db.json'); // one file with many line, need to read one at time
-//	$mac_vendor = json_decode($json_data, true );
-// build the page
 	?>
 	
 	<script type="text/javascript">
@@ -299,12 +291,12 @@ table plugin_ciscotools_mactrack
 							. $row['description'] . '</td>
 							<td>' . $row['mac'] . '</td>
 							<td>' . $row['ip'] . '</td>
-							<td>' . date("Y/m/d H:i:s", strtotime($row['date']) ) . '</td>
+							<td>' . date("d/m/Y H:i:s", strtotime($row['date']) ) . '</td>
 							<td>' . $row['vlan_name'] . '</td>
 							<td>' . $row['vlan_id'] . '</td>
 							<td>' . $row['switch'] . '</td>
 							<td>' . $row['intf_name'] . '</td>
-							<td>' . $row['id'] . '</td>';
+							<td>' . substr($row['mac'], 0, 2).':'.substr($row['mac'],2,2).':'.substr($row['mac'],4, 2) . '</td>';
 					print "</tr>";
 		}
 	}else{
