@@ -124,7 +124,6 @@ table plugin_ciscotools_mactrack
 			WHERE mac.port_index=intf.snmp_index
 			AND intf.field_name='ifDescr'
 			".$sql_where;
-ciscotools_log('sql query: '.$sql_total_row);	
 	$total_rows = db_fetch_cell( $sql_total_row );
 			
 	/* if the number of rows is -1, set it to the default */
@@ -150,7 +149,6 @@ ciscotools_log('sql query: '.$sql_total_row);
 			$sql_where
 			ORDER BY ".$sort_column." ".$sort_direction." 
 			LIMIT " . $sql_limit;
-ciscotools_log('sql query: '.$sql_query);
 	$result = db_fetch_assoc($sql_query); // query result is one entry par backup
 
 	?>

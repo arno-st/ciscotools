@@ -61,7 +61,7 @@ function get_wifi_mac_table($hostrecord_array) {
  ); // return OID with MAC and HEX MAC as value
 //ciscotools_log('1: get MAC table array' . print_r( $arp_table_array ,true) );
 	if( empty($arp_table_array) ){
-		cacti_log('no mac on: '.$hostrecord_array['description'], false, 'CISCOTOOLS' );
+		cacti_log('no mac on: '.$hostrecord_array['description'].' mac array: '. print_r($arp_table_array,true), false, 'CISCOTOOLS' );
 		return; // if no mac don't go durther
 	}
 
@@ -159,6 +159,7 @@ function get_wifi_mac_table($hostrecord_array) {
 		}
 		
 		// parse for name
+		$mac_array[$cnt]['description'] = '';
 		foreach( $hostname_table_array as $hostname) {
 			$mac_hostname_oid = $snmp_client_name . $mac_oid;
 			if( $hostname['oid'] != $mac_hostname_oid ) continue; // Mac dosen't match what we are looking for, so go to next one
@@ -167,6 +168,7 @@ function get_wifi_mac_table($hostrecord_array) {
 			break; // find so exit
 		}
 		// parse for SSID, as vlan name
+		$mac_array[$cnt]['vlan_name'] = '';
 		foreach( $ssid_table_array as $ssid) {
 			$mac_ssid_oid = $snmp_client_ssid . $mac_oid;
 			if( $ssid['oid'] != $mac_ssid_oid ) continue; // Mac dosen't match what we are looking for, so go to next one
@@ -175,6 +177,7 @@ function get_wifi_mac_table($hostrecord_array) {
 			break; // find so exit
 		}
 		// parse for vlan id
+		$mac_array[$cnt]['vlan_id'] ='';
 		foreach( $vlan_id_table_array as $vlan_id) {
 			$mac_vlan_id_oid = $snmp_client_vlan_id . $mac_oid;
 			if( $vlan_id['oid'] != $mac_vlan_id_oid ) continue; // Mac dosen't match what we are looking for, so go to next one
