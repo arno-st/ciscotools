@@ -61,7 +61,7 @@ function get_wifi_mac_table($hostrecord_array) {
  ); // return OID with MAC and HEX MAC as value
 //ciscotools_log('1: get MAC table array' . print_r( $arp_table_array ,true) );
 	if( empty($arp_table_array) ){
-		cacti_log('no mac on: '.$hostrecord_array['description'].' mac array: '. print_r($arp_table_array,true), false, 'CISCOTOOLS' );
+		cacti_log('no mac on: '.$hostrecord_array['description'], false, 'CISCOTOOLS' );
 		return; // if no mac don't go durther
 	}
 
