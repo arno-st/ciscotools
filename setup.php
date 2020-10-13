@@ -80,7 +80,9 @@ function ciscotools_check_upgrade() {
 
 	$version = plugin_ciscotools_version ();
 	$current = $version['version'];
-	$old     = read_config_option('plugin_ciscotools_version');
+	$old     = db_fetch_cell('SELECT version
+		FROM plugin_config
+		WHERE directory="ciscotools"');
 
 	ciscotools_setup_tables();
 
