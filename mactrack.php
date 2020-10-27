@@ -86,9 +86,10 @@ function get_mac_table($hostrecord_array) {
 			if ( !empty($vlan_array) ) {
 				$mac_array = get_mac_vlan( $hostrecord_array, $vlan_array );
 			
-				if ( !empty($mac_array) )
+				if ( !empty($mac_array) ) {
 					get_ip_4_mac( $hostrecord_array, $mac_array);
-			}
+				} else ciscotools_log('Empty mac_array');
+			} else ciscotools_log('Empty vlan_array');
 		break;
 	}
 }

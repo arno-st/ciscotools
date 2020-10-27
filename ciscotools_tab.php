@@ -24,7 +24,8 @@
 chdir('../../');
 include_once('./include/auth.php');
 
-set_default_action('backup');
+set_default_action('display_mac');
+
 
 switch(get_request_var('action')) {
 	case 'diff':

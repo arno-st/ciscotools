@@ -51,8 +51,9 @@ function plugin_ciscotools_install () {
 	api_plugin_register_hook('ciscotools', 'utilities_action', 'ciscotools_utilities_action', 'setup.php');
 	api_plugin_register_hook('ciscotools', 'utilities_list', 'ciscotools_utilities_list', 'setup.php');
 
-//	api_plugin_register_realm('ciscotools', 'upgrade.php', 'Plugin -> CiscoTools: Upgrade', 1);
-	api_plugin_register_realm('ciscotools', 'ciscotools_tab.php,display_backup.php,mactrack.php', 'Plugin -> Cisco Tools', 1);
+	api_plugin_register_realm('ciscotools', 'ciscotools_tab.php,display_mac.php', 'Plugin -> CiscoTools: Display Mac' );
+	api_plugin_register_realm('ciscotools', 'display_backup.php', 'Plugin -> Cisco Tools: Display Backup');
+	api_plugin_register_realm('ciscotools', 'upgrade/display_upgade.php', 'Plugin -> Cisco Tools: Upgrade');
 	
 	ciscotools_setup_tables();
 }
@@ -175,6 +176,13 @@ function ciscotools_check_upgrade() {
 				} while( !feof($fp) );
 			}
 		}
+		if( $old < '1.2.3' ) {
+			api_plugin_remove_realms('ciscotools');
+			api_plugin_register_realm('ciscotools', 'ciscotools_tab.php,display_mac.php', 'Plugin -> CiscoTools: Display Mac', 1);
+			api_plugin_register_realm('ciscotools', 'display_backup.php', 'Plugin -> Cisco Tools: Display Backup', 1);
+			api_plugin_register_realm('ciscotools', 'upgrade/display_upgade.php', 'Plugin -> Cisco Tools: Upgrade', 1);
+		}
+
 	}
 
 	// if mac running is on change for a number to know how many process are running
