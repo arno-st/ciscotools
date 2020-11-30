@@ -718,12 +718,12 @@ function ciscotools_poller_bottom () {
 		. " | diff: " . (time() - $lastMacPoller));
 	}
 	else {
-		$macCmdString = trim(read_config_option('path_php_binary'));
-		// If its not set, just assume its in the path
-		if (trim($macCmdString) == '')
-			$macCmdString = 'php';
 		if( read_config_option('ciscotools_mac_running') == 0 ) {
 			cacti_log('Start Mac polling', false, 'CISCOTOOLS');
+			$macCmdString = trim(read_config_option('path_php_binary'));
+			// If its not set, just assume its in the path
+			if (trim($macCmdString) == '')
+				$macCmdString = 'php';
 			set_config_option('ciscotools_mac_running', $mactrack_nb_process );
 			$process = 1;
 			do {
