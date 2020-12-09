@@ -322,19 +322,9 @@ function ciscotools_diff() {
 
 }
 
-function ciscotools_output() {
+function ciscotools_output( $versionid ) {
     global $config;
-	/* ================= input validation ================= */
-	input_validate_input_number(get_request_var("versionid"));
-	/* ==================================================== */
-	$versionid = get_request_var('versionid');
-	/* ================= input validation ================= */
-	input_validate_input_number(get_request_var("page"));
-	input_validate_input_number(get_request_var("rows"));
-	/* ==================================================== */
 
-	general_header();
-	
 	$sql_query = 'SELECT host.id as id, 
 			host.description as description, host.hostname as hostname, pctb.version as version, pctb.datechange as date, pctb.diff as config
 			FROM plugin_ciscotools_backup pctb
@@ -342,24 +332,10 @@ function ciscotools_output() {
 			WHERE pctb.id ='. $versionid;
 	
 	$result = db_fetch_row($sql_query); // query result is one entry par backup
+	// export CSV device list
+	header("Content-Type: text/plain");
+	header("Content-Disposition: attachment; filename=".$result['description'].".txt");
 
-	$start_text = 'Cisco Tools output of the version '
-	. $result['version']
-	. ' for device: ' .$result['description'].', backup date:' .$result['date'];
-	
-	html_start_box($start_text, '100%', '', '3', 'center', '');
- 		
-	if (!empty($result)) {
-			print	"<td >".'Config requested';
-			print	"<div style='border: 1px solid black;background:#E5E5E5;'>" . nl2br($result['config']) . '</div>';
-			print	'</td>';
-	} else{
-		print "<tr><td style='padding: 4px; margin: 4px;' colspan=11><center>There are no Backup to display!</center></td></tr>";
-	}
-	
-	html_end_box();
-		
-	bottom_footer();
-	
+	print( $result['config'] );
 }
 ?>

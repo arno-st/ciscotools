@@ -43,17 +43,16 @@ switch(get_request_var('action')) {
 		break;
 
 	case 'output':
-		general_header();
 		$versionid = get_request_var('versionid');
 		if( $versionid ) {
-			ciscotools_tabs();
-			ciscotools_output();
+			ciscotools_output($versionid);
 		} else  {
+			general_header();
 			set_request_var('action', 'backup' );
 			ciscotools_tabs();
 			ciscotools_displaybackup();
+			bottom_footer();
 		}
-		bottom_footer();
 		break;
 
 	case 'backup': 
@@ -85,7 +84,6 @@ function ciscotools_tabs() {
 	$tabs = array(
 		'backup'    	=> __('Backup', 'ciscotools'),
 		'diff'      	=> __('Diff', 'ciscotools'),
-		'output'		=> __('Backup Output', 'ciscotools'),
 		'display_mac'	=> __('Display Mac', 'ciscotools'),
 		'upgrade'		=> __('Upgrade', 'ciscotools')
 	);
