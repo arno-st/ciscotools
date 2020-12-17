@@ -33,21 +33,21 @@ function ciscotools_upgrade_get_infos($deviceID)
     $device = ciscotools_upgrade_get_device($deviceID);
     if($device === false)
     {   // Error getting device infos
-        ciscotools_upgrade_table($deviceID, 'update', 15);
+        ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_INFO_ERROR);
         return false;
     }
 
     $snmp = ciscotools_upgrade_get_snmp($device);
     if($snmp === false) 
     {   // Error getting SNMP infos
-        ciscotools_upgrade_table($deviceID, 'update', 16);
+        ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_SNMP_ERROR);
         return false;
     }
     
     $model = ciscotools_upgrade_get_version($device);
     if($model === false)
     {   // Error getting image infos
-        ciscotools_upgrade_table($deviceID, 'update', 17);
+        ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_IMAGE_INFO_ERROR);
         return false;
     }
 
@@ -81,7 +81,7 @@ function ciscotools_upgrade_get_device($deviceID)
 
     if($infosDevice === false) 
     {   // Model unsupported
-        ciscotools_upgrade_table($deviceID, 'update', 9);
+        ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_UNSUPORTED);
         return false;
     }
     return $infosDevice;

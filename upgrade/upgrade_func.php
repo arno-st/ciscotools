@@ -34,32 +34,33 @@
  */
 function ciscotools_upgrade_device_check()
 {
+	// remove device Down, disabled and non Cisco type
     $sqlQuery = "SELECT host.id as 'id', host.type as 'type', host.hostname as 'hostname', 
                 plugin_ciscotools_image.image as 'image' 
                 FROM host 
                 LEFT JOIN plugin_ciscotools_image ON host.type = plugin_ciscotools_image.model 
-                WHERE host.type <> '' 
+                WHERE host.type <> '' AND host.disabled !='on' AND host.status ='3'
                 AND host.type IN (
                     SELECT plugin_extenddb_model.model FROM plugin_extenddb_model WHERE host.type = plugin_extenddb_model.model
                 )
                 AND NOT EXISTS (
                     SELECT plugin_ciscotools_upgrade.host_id FROM plugin_ciscotools_upgrade 
                     WHERE host.id = plugin_ciscotools_upgrade.host_id
-                    AND plugin_ciscotools_upgrade.status <> '21'
+                    AND plugin_ciscotools_upgrade.status <> ".UPGRADE_STATUS_NEED_RECHECK."
                 )
-                GROUP BY host.id
                 ORDER BY host.id";
     $result = db_fetch_assoc($sqlQuery);
 
     foreach($result as $device)
     {   // Perform a ping
-        $ping = shell_exec("ping -c 1 -s 64 -t 64 -w 1 " . $device['hostname']);
-        if(empty($ping)) continue;
+	// why !?!? just check the status in Cacti
+//        $ping = shell_exec("ping -c 1 -s 64 -t 64 -w 1 " . $device['hostname']);
+  //      if(empty($ping)) continue;
 
         $stream = create_ssh($device['id']);
         if($stream === false)
         {
-            ciscotools_upgrade_table($device['id'], 'add', 18);
+            ciscotools_upgrade_table($device['id'], 'add', UPGRADE_STATUS_SSH_ERROR);
             continue;
         }
         if(ssh_write_stream($stream, "dir") === false) continue;
@@ -69,22 +70,22 @@ function ciscotools_upgrade_device_check()
         $regexGetVersion = "/\.([0-9.EAMmz-]+)(|\.SPA)\.(bin|tar|pkg)/";
         if(!preg_match($regexGetVersion, $device['image'], $resultRegex))
         {   // Error in table 'upgrade'
-            ciscotools_upgrade_table($device['id'], 'add', 8);
+            ciscotools_upgrade_table($device['id'], 'add', UPGRADE_STATUS_TABLE_ERROR);
             continue;
         }
         if(!preg_match("/" . $resultRegex[1] . "/", $sshResult, $checkUpgrade))
         {   // Need to be upgraded
-            ciscotools_upgrade_table($device['id'], 'add', 5);
+            ciscotools_upgrade_table($device['id'], 'add', UPGRADE_STATUS_NEED_UPGRADE);
             continue;
         }
         if($checkUpgrade[0] === $resultRegex[1])
         {   // Up to date
-            ciscotools_upgrade_table($device['id'], 'add', 20);
+            ciscotools_upgrade_table($device['id'], 'add', UPGRADE_STATUS_UPDATE_OK);
             continue;
         }
         else 
         {   // Need to be upgraded
-            ciscotools_upgrade_table($device['id'], 'add', 5);
+            ciscotools_upgrade_table($device['id'], 'add', UPGRADE_STATUS_NEED_UPGRADE);
         }
     }
 }
@@ -131,7 +132,7 @@ function ciscotools_upgrade_check_version($deviceID, $infos)
     $stream = create_ssh($deviceID);
     if($stream === false)
     {
-        ciscotools_upgrade_table($deviceID, 'update', 18);
+        ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_SSH_ERROR);
         return;
     }
     
@@ -195,14 +196,14 @@ function ciscotools_upgrade_check_upload($deviceInfos, $snmpInfos)
         }
         else
         {
-            ciscotools_upgrade_table($deviceInfos['id'], 'update', 14);
+            ciscotools_upgrade_table($deviceInfos['id'], 'update', UPGRADE_STATUS_UPLOAD_ERROR);
             ciscotools_log("[ERROR] Upgrade: upload error!");
             return 'error';
         }
     }
     else
     {
-        ciscotools_upgrade_table($deviceInfos['id'], 'update', 14);
+        ciscotools_upgrade_table($deviceInfos['id'], 'update', UPGRADE_STATUS_UPLOAD_ERROR);
         ciscotools_log("[ERROR] Upgrade: an error occured with the upload on " . $deviceInfos['description'] . "!");
         return 'error';
     }
@@ -226,7 +227,7 @@ function ciscotools_upgrade_check_image($deviceID, $deviceIP, $snmpInfos, $fileN
     {
         if(!$result[0] || $result[0] != $fileName)
         {   // Error in installation
-            ciscotools_upgrade_table($deviceID, 'update', 15);
+            ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_INFO_ERROR);
             return false;
         }
     }
@@ -381,7 +382,7 @@ function ciscotools_upgrade_upload_image($deviceID, $infos, $tftpAddress)
     if(sizeof($uploadStatus) < 1) return false;
     else
     {
-        if($uploadStatus[1] === '1') ciscotools_upgrade_table($infos['device']['id'], 'update', 2);
+        if($uploadStatus[1] === '1') ciscotools_upgrade_table($infos['device']['id'], 'update', UPGRADE_STATUS_UPLOADING);
         else return false;
     }
     return true;
@@ -400,7 +401,7 @@ function ciscotools_upgrade_delete_images($deviceInfos, $fileName)
     $stream = create_ssh($deviceInfos['id']);
     if($stream === false)
     {
-        ciscotools_upgrade_table($deviceID, 'update', 18);
+        ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_SSH_ERROR);
         return false;
     }
     if(ssh_write_stream($stream, 'dir') === false) return false;

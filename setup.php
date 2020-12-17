@@ -22,6 +22,7 @@
  +-------------------------------------------------------------------------+
 */
 
+include_once($config['base_path'] . '/plugins/ciscotools/upgrade/upgrade_const.php');
 include_once($config['base_path'] . '/plugins/ciscotools/upgrade/display_upgrade.php');
 include_once($config['base_path'] . '/plugins/ciscotools/display_backup.php');
 include_once($config['base_path'] . '/plugins/ciscotools/display_mac.php');
@@ -53,7 +54,8 @@ function plugin_ciscotools_install () {
 
 	api_plugin_register_realm('ciscotools', 'ciscotools_tab.php,display_mac.php', 'Plugin -> CiscoTools: Display Mac' );
 	api_plugin_register_realm('ciscotools', 'display_backup.php', 'Plugin -> Cisco Tools: Display Backup');
-	api_plugin_register_realm('ciscotools', 'upgrade/display_upgade.php', 'Plugin -> Cisco Tools: Upgrade');
+	api_plugin_register_realm('ciscotools', 'upgrade/display_upgade.php', 'Plugin -> CiscoTools: Upgrade');
+	api_plugin_register_realm('ciscotools', 'display_image.php', 'Plugin -> CiscoTools: Images');
 	
 	ciscotools_setup_tables();
 }
@@ -99,58 +101,7 @@ function ciscotools_check_upgrade() {
 			WHERE directory='" . $version['name'] . "' ");
 	
 		if( $old < '1.1' ) {
-/* table to keep a queue of upgrade */
-			unset($data);
-			$data = array();
-			$data['columns'][] = array('name' => 'id', 'type' => 'mediumint(8)', 'auto_increment' => '');
-			$data['columns'][] = array('name' => 'host_id', 'type' => 'mediumint(8)', 'NULL' => false, 'default' => '0');
-			$data['columns'][] = array('name' => 'status', 'type' => 'tinyint(1)', 'NULL' => false, 'default' => '0');
-			$data['primary'] = 'id';
-			$data['keys'][] = array('name' => 'id', 'columns' => 'id');
-			$data['keys'][] = array('name' => 'host_id', 'columns' => 'host_id');
-			$data['type'] = 'InnoDB';
-			api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_upgrade', $data);
-
-/* table to keep diff info for image */
-			unset($data);
-			$data = array();
-			$data['columns'][] = array('name' => 'id', 'type' => 'mediumint(8)', 'auto_increment' => '');
-			$data['columns'][] = array('name' => 'model', 'type' => 'varchar(64)', 'NULL' => false);
-			$data['columns'][] = array('name' => 'image', 'type' => 'varchar(255)', 'NULL' => false);
-			$data['columns'][] = array('name' => 'mode', 'type' => 'varchar(7)', 'NULL' => false, 'default' => 'bundle');
-			$data['primary'] = 'id';
-			$data['keys'][] = array('name' => 'model', 'columns' => 'model');
-			$data['type'] = 'InnoDB';
-			api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_image', $data);
 		
-			/* insert values in plugin_ciscotools_image */
-			db_execute("INSERT INTO plugin_ciscotools_image 
-				(`model`, `image`, `mode`) VALUES 
-				('IR807-LTE-GA-K9', 'ir800l-universalk9-mz.SPA.159-3.M.bin', 'bundle'),
-				('C819HG-U-K9', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'bundle'),
-				('C819G-4G-GA-K9', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'bundle'),
-				('C819G-U-K9', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'bundle'),
-				('C819G-4G-G-K9', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'bundle'),
-				('CISCO881', 'c880data-universalk9-mz.155-3.M6.bin', 'bundle'),
-				('CISCO891-K9', 'c890-universalk9-mz.155-3.M8.bin', 'bundle'),
-				('cisco891F', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'bundle'),
-				('IR1101-K9', 'ir1101-universalk9.16.12.03.SPA.bin', 'bundle'),
-				('CISCO3945-CHASSIS', 'c3900-universalk9-mz.SPA.155-3.M4.bin', 'bundle'),
-				('IE-2000-4T-G-B', 'ie2000-universalk9-tar.152-4.EA7.tar', 'bundle'),
-				('IE-2000-4TC-G-B', 'ie2000-universalk9-tar.152-4.EA7.tar', 'bundle'),
-				('IE-2000-8TC-G-B', 'ie2000-universalk9-tar.152-4.EA7.tar', 'bundle'),
-				('IE-2000-16PTC-G-E', 'ie2000-universalk9-tar.152-4.EA7.tar', 'bundle'),
-				('IE-3000-8TC', 'ies-lanbasek9-tar.152-4.EA8.tar', 'bundle'),
-				('WS-C2960X-24PS-L', 'c2960x-universalk9-mz.152-6.E2.bin', 'bundle'),
-				('WS-C2960S-24PS-L', 'c2960s-universalk9-mz.152-2.E9.bin', 'bundle'),
-				('WS-C3560CG-8PC-S', 'c3560c405ex-universalk9-mz.152-2.E6.bin', 'bundle'),
-				('WS-C3560CX-12PC-S', 'c3560cx-universalk9-mz.152-7.E2.bin', 'bundle'),
-				('WS-C3560CX-12PD-S', 'c3560cx-universalk9-mz.152-7.E2.bin', 'bundle'),
-				('WS-C3850-24XS-S', 'cat3k_caa-universalk9.16.06.06.SPA.bin', 'bundle'),
-				('WS-C-4500X-32', 'cat4500e-universalk9.SPA.03.06.05.E.152-2.E5.bin', 'bundle'),
-				('C9200L-24P-4G-E', 'cat9k_lite_iosxe.16.09.05.SPA.bin', 'install'),
-                ('C9500-16X', 'cat9k_iosxe.16.09.05.SPA.bin', 'install')"
-            );
 		}
 		if( $old < '1.2.2' ) {
 // add MAC vendor information from :
@@ -179,12 +130,15 @@ function ciscotools_check_upgrade() {
 		if( $old < '1.2.3' ) {
 			api_plugin_remove_realms('ciscotools');
 			api_plugin_register_realm('ciscotools', 'ciscotools_tab.php,display_mac.php', 'Plugin -> CiscoTools: Display Mac', 1);
-			api_plugin_register_realm('ciscotools', 'display_backup.php', 'Plugin -> Cisco Tools: Display Backup', 1);
-			api_plugin_register_realm('ciscotools', 'upgrade/display_upgade.php', 'Plugin -> Cisco Tools: Upgrade', 1);
+			api_plugin_register_realm('ciscotools', 'display_backup.php', 'Plugin -> CiscoTools: Display Backup', 1);
+			api_plugin_register_realm('ciscotools', 'upgrade/display_upgade.php', 'Plugin -> CiscoTools: Upgrade', 1);
+			api_plugin_register_realm('ciscotools', 'display_image.php', 'Plugin -> CiscoTools: Images', 1);
 		}
 
 	}
 
+	fill_image_db(); // fill the image DB with inormation
+	
 	// if mac running is on change for a number to know how many process are running
 	if( read_config_option('ciscotools_mac_running') == 'off' ) set_config_option('ciscotools_mac_running', '0');
 }
@@ -239,11 +193,16 @@ function ciscotools_setup_tables() {
 	$data['keys'][] = array('name' => 'description', 'columns' => 'description');
 	$data['type'] = 'InnoDB';
 	$data['comment'] = 'Plugin ciscotoole - Table for MacTrack information';
-	$data['unique_keys'][] = array('name' => 'record', 'columns' => 'host_id,mac_address,port_index' );
 	api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_mactrack', $data);
+
+	// create unique record for host/mac on port
+	$mysql = "ALTER IGNORE TABLE `plugin_ciscotools_mactrack` ADD INDEX `record` ( `host_id`, `mac_address`, `port_index`)";
+	$ret = db_execute($mysql);
+
 	// add mac info into the host table
 	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'keep_mac_track', 'type' => 'varchar(2)', 'NULL' => true, 'default' => ''));
 
+	
 /* table to keep OID information */
 /*
 {"oui":"98:74:DA","isPrivate":false,"companyName":"Infinix mobility Ltd","companyAddress":"RMS 05-15, 13A/F SOUTH TOWER WORLD FINANCE CTR HARBOUR CITY 17 CANTON RD TST KLN HONG KONG HongKong HongKong 999077 HK","countryCode":"HK","assignmentBlockSize":"MA-L","dateCreated":"2017-02-21","dateUpdated":"2017-02-21"}
@@ -260,6 +219,31 @@ function ciscotools_setup_tables() {
 	$data['type'] = 'InnoDB';
 	$data['comment'] = 'Plugin ciscotoole - Table for OUI MAC information';
 	api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_oui', $data);
+
+	/* table to keep a queue of upgrade */
+	unset($data);
+	$data = array();
+	$data['columns'][] = array('name' => 'id', 'type' => 'mediumint(8)', 'auto_increment' => '');
+	$data['columns'][] = array('name' => 'host_id', 'type' => 'mediumint(8)', 'NULL' => false, 'default' => '0');
+	$data['columns'][] = array('name' => 'status', 'type' => 'tinyint(1)', 'NULL' => false, 'default' => '0');
+	$data['primary'] = 'id';
+	$data['keys'][] = array('name' => 'id', 'columns' => 'id');
+	$data['keys'][] = array('name' => 'host_id', 'columns' => 'host_id');
+	$data['type'] = 'InnoDB';
+	api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_upgrade', $data);
+
+/* table to keep diff info for image */
+	unset($data);
+	$data = array();
+	$data['columns'][] = array('name' => 'id', 'type' => 'mediumint(8)', 'auto_increment' => '');
+	$data['columns'][] = array('name' => 'model', 'type' => 'varchar(64)', 'NULL' => false);
+	$data['columns'][] = array('name' => 'image', 'type' => 'varchar(255)', 'NULL' => false);
+	$data['columns'][] = array('name' => 'mode', 'type' => 'varchar(7)', 'NULL' => false, 'default' => 'bundle');
+	$data['primary'] = 'id';
+	$data['keys'][] = array('name' => 'model', 'columns' => 'model');
+	$data['type'] = 'InnoDB';
+	api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_image', $data);
+
 }
 
 function plugin_ciscotools_version () {
@@ -276,7 +260,7 @@ function ciscotools_check_dependencies() {
 
 function ciscotools_config_arrays () {
 	global $ciscotools_console_type,$ciscotools_backup_frequencies, $ciscotools_retention_duration, $mactrack_poller_frequencies,
-	$mactrack_data_retention;
+	$mactrack_data_retention, $statusText, $statusColor;
 
 	$ciscotools_console_type = array(
 		"0" => "Disabled",
@@ -328,7 +312,6 @@ function ciscotools_config_arrays () {
 		'-8 months' => __('%d Months', 8, 'mactrack'),
 		'-1 years' => __('%d Year', 1, 'mactrack')
 	);
-
 }
 
 function ciscotools_config_form () {
@@ -516,7 +499,13 @@ function ciscotools_config_settings () {
 			'method' => 'textbox',
 			'max_length' => 5,
 			'default' => '2'
-		)
+			),
+		'ciscotools_mactrack_log_debug' => array(
+			'friendly_name' => 'Debug Log',
+			'description' => 'Enable logging of debug messages for mactrack',
+			'method' => 'checkbox',
+			'default' => 'off'
+		),
 	);
 }
 
@@ -649,7 +638,7 @@ function ciscotools_poller_bottom () {
 	include_once($config['library_path'] . '/poller.php');
 	include_once($config["library_path"] . "/database.php");
 
-	// Upgrade Poller
+	//*************** Upgrade Poller
 	$pollerIntervalUpgrade = "300"; // 60: 1 minute | 300: 5 minutes
 	$lastPoller = read_config_option('ciscotools_upgrade_lastPoll'); // See when was the last poll for an upgrade
 	
@@ -673,7 +662,7 @@ function ciscotools_poller_bottom () {
 		set_config_option('ciscotools_upgrade_lastPoll', time()); // Set the last poll for an upgrade check
 	}
 
-	// Backup Poller
+	//************* Backup Poller
 	$poller_interval = read_config_option('ciscotools_check_backup');
 
 	if ($poller_interval == "0") {
@@ -708,7 +697,8 @@ function ciscotools_poller_bottom () {
 			cacti_log('Backup is running', false, 'CISCOTOOLS');
 		}
 	}
-	// mactrack poller
+	
+	//****************** mactrack poller
 	$pollerIntervalMac = read_config_option('ciscotools_mac_collection_timing');
 	$lastMacPoller = read_config_option('ciscotools_mac_lastPoll'); // See when was the last poll for an mac update
 	$mactrack_nb_process = read_config_option('ciscotools_nb_mactrack_process'); // how many process we spawn
@@ -777,6 +767,7 @@ function ciscotools_utilities_list () {
 	<?php
 	form_end_row();
 	form_alternate_row();
+	
 	?>
 		<td class="textArea">
 			<a href='utilities.php?action=ciscotools_purge'>Remove all backup</a>
@@ -820,4 +811,35 @@ function ciscotools_log( $text ){
 	}
 }
 
+function fill_image_db(){
+	/* insert values in plugin_ciscotools_image */
+	db_execute("INSERT INTO plugin_ciscotools_image 
+		(`model`, `image`, `mode`) VALUES 
+		('IR807-LTE-GA-K9', 'ir800l-universalk9-mz.SPA.159-3.M.bin', 'bundle'),
+		('C819HG-U-K9', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'bundle'),
+		('C819G-4G-GA-K9', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'bundle'),
+		('C819G-U-K9', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'bundle'),
+		('C819G-4G-G-K9', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'bundle'),
+		('CISCO881', 'c880data-universalk9-mz.155-3.M6.bin', 'bundle'),
+		('CISCO891-K9', 'c890-universalk9-mz.155-3.M8.bin', 'bundle'),
+		('cisco891F', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'bundle'),
+		('IR1101-K9', 'ir1101-universalk9.16.12.03.SPA.bin', 'bundle'),
+		('CISCO3945-CHASSIS', 'c3900-universalk9-mz.SPA.155-3.M4.bin', 'bundle'),
+		('IE-2000-4T-G-B', 'ie2000-universalk9-tar.152-4.EA7.tar', 'bundle'),
+		('IE-2000-4TC-G-B', 'ie2000-universalk9-tar.152-4.EA7.tar', 'bundle'),
+		('IE-2000-8TC-G-B', 'ie2000-universalk9-tar.152-4.EA7.tar', 'bundle'),
+		('IE-2000-16PTC-G-E', 'ie2000-universalk9-tar.152-4.EA7.tar', 'bundle'),
+		('IE-3000-8TC', 'ies-lanbasek9-tar.152-4.EA8.tar', 'bundle'),
+		('WS-C2960X-24PS-L', 'c2960x-universalk9-mz.152-6.E2.bin', 'bundle'),
+		('WS-C2960S-24PS-L', 'c2960s-universalk9-mz.152-2.E9.bin', 'bundle'),
+		('WS-C3560CG-8PC-S', 'c3560c405ex-universalk9-mz.152-2.E6.bin', 'bundle'),
+		('WS-C3560CX-12PC-S', 'c3560cx-universalk9-mz.152-7.E2.bin', 'bundle'),
+		('WS-C3560CX-12PD-S', 'c3560cx-universalk9-mz.152-7.E2.bin', 'bundle'),
+		('WS-C3850-24XS-S', 'cat3k_caa-universalk9.16.06.06.SPA.bin', 'bundle'),
+		('WS-C-4500X-32', 'cat4500e-universalk9.SPA.03.06.05.E.152-2.E5.bin', 'bundle'),
+		('C9200L-24P-4G-E', 'cat9k_lite_iosxe.16.09.05.SPA.bin', 'install'),
+        ('C9500-16X', 'cat9k_iosxe.16.09.05.SPA.bin', 'install')"
+    );
+
+}
 ?>

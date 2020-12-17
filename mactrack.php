@@ -50,7 +50,7 @@ SNMPv2-SMI::enterprises.14179.2.1.4.1.7.0.22.127.44.103.58 = STRING: "DATAS"
 
 function purge_mac(){
 	$datetopurge = date('YmdHis',strtotime(read_config_option('ciscotools_mac_data_retention')) );
-	cacti_log( 'Mactrack Purge Before: '.$datetopurge, false, 'CISCOTOOLS' );
+	cacti_log( 'Mactrack Purge Before: '.$datetopurge, false, 'MACTRACK' );
 
 // return the list of record to purge
 	$sqlquery = "SELECT *
@@ -66,7 +66,6 @@ function purge_mac(){
 }
 
 function get_mac_table($hostrecord_array) {
-	ciscotools_log('Pool mac for host:'.$hostrecord_array['description']);
 	// make a test if it's a device like WiFi controler (snmp_sysObjectID=iso.3.6.1.4.1.9.1.1069) call another set of function.
 	// spécial php code is used for that
 	
@@ -88,8 +87,8 @@ function get_mac_table($hostrecord_array) {
 			
 				if ( !empty($mac_array) ) {
 					get_ip_4_mac( $hostrecord_array, $mac_array);
-				} else ciscotools_log('Empty mac_array');
-			} else ciscotools_log('Empty vlan_array');
+				} else mactrack_log('Empty mac_array');
+			} else mactrack_log('Empty vlan_array');
 		break;
 	}
 }
@@ -173,9 +172,9 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 	$hostrecord_array['snmp_priv_passphrase'],
 	$hostrecord_array['snmp_priv_protocol']
 	);
-//ciscotools_log('1: get itf type: '.print_r($intf_type_array, true) );
+//mactrack_log('1: get itf type: '.print_r($intf_type_array, true) );
 
-//ciscotools_log('2: get trunk array');
+//mactrack_log('2: get trunk array');
 	// Check if it's a trunk, if so make vlan_name as trunk and id 0
 	$intf_trunk_array = cacti_snmp_walk( $hostrecord_array['hostname'], $hostrecord_array['snmp_community'], 
 	$snmp_is_trunk, $hostrecord_array['snmp_version'],
@@ -200,7 +199,7 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 			$hostrecord_array['snmp_auth_protocol'],
 			$hostrecord_array['snmp_priv_passphrase'],
 			$hostrecord_array['snmp_priv_protocol'] );
-//ciscotools_log('3: mac address array: '.print_r($mac_address_array, true). ' for vlan: '.$vlan_array[$vlankey]['id']);
+//mactrack_log('3: mac address array: '.print_r($mac_address_array, true). ' for vlan: '.$vlan_array[$vlankey]['id']);
 
 			$bridge_port_array = cacti_snmp_walk( $hostrecord_array['hostname'], $snmp_community, 
 			$snmp_bridge_port_number, $hostrecord_array['snmp_version'],
@@ -210,7 +209,7 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 			$hostrecord_array['snmp_priv_passphrase'],
 			$hostrecord_array['snmp_priv_protocol']
 			); // return a value used to get index of internet interface, and oid with the mac
-//ciscotools_log('4: get bridge port array: '.print_r($bridge_port_array,true). ' for vlan: '.$vlan_array[$vlankey]['id'] );
+//mactrack_log('4: get bridge port array: '.print_r($bridge_port_array,true). ' for vlan: '.$vlan_array[$vlankey]['id'] );
 			if( empty($bridge_port_array) ) continue; // if no bridge port, no mac, go further
 		
 		// get interface index from bridge port for all interface in that vlan
@@ -222,7 +221,7 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 			$hostrecord_array['snmp_priv_passphrase'],
 			$hostrecord_array['snmp_priv_protocol']);
 		 
-//ciscotools_log('5: get bridge2index array: '.print_r($intf_index_array, true));
+//mactrack_log('5: get bridge2index array: '.print_r($intf_index_array, true));
 	} else {
 			$snmp_context = 'vlan-'.$vlan_array[$vlankey]['id'];
 			$mac_address_array = cacti_snmp_walk( $hostrecord_array['hostname'], '', $snmp_mac_list, 
@@ -234,7 +233,7 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 			$hostrecord_array['snmp_priv_protocol'],
 			$snmp_context );
 
-//ciscotools_log('3: mac address array: '.print_r($mac_address_array, true). ' for vlan: '.$vlan_array[$vlankey]['id']);
+//mactrack_log('3: mac address array: '.print_r($mac_address_array, true). ' for vlan: '.$vlan_array[$vlankey]['id']);
 
 			$bridge_port_array = cacti_snmp_walk( $hostrecord_array['hostname'], '', 
 			$snmp_bridge_port_number, $hostrecord_array['snmp_version'],
@@ -245,7 +244,7 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 			$hostrecord_array['snmp_priv_protocol'],
 			$snmp_context); // return a value used to get index of internet interface, and oid with the mac
 				
-//ciscotools_log('4: get bridge port array: '.print_r($bridge_port_array,true). ' for vlan: '.$vlan_array[$vlankey]['id'] );
+//mactrack_log('4: get bridge port array: '.print_r($bridge_port_array,true). ' for vlan: '.$vlan_array[$vlankey]['id'] );
 			if( empty($bridge_port_array) ) continue; // if no bridge port, no mac, go further
 			
 			// get interface index from bridge port for all interface in that vlan
@@ -257,7 +256,7 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 			$hostrecord_array['snmp_priv_passphrase'],
 			$hostrecord_array['snmp_priv_protocol'],
 			$snmp_context );
-//ciscotools_log('5: get bridge2index array: '.print_r($intf_index_array, true));
+//mactrack_log('5: get bridge2index array: '.print_r($intf_index_array, true));
 		} // return an array OID and MAC as human readable
 
 //*** save to the return array, so to the match for all MAC on a VLAN
@@ -278,6 +277,7 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 			// dosen't match!! $key to big, look for mac on OID
 			// do a do-while onthe OID of the bridge_port_array to find the MAC address, then get the value to parse the bridge2index OID to get the port_index in the value
 			$mac_array[$cnt]['port_index'] = '';
+			$bridge2index = '';
 			foreach($bridge_port_array as $bridge_port ) {
 				if( $bridge_port['oid'] != $mac_oid ) continue; // Port dosen't match what we are looking for, so go to next one
 				$bridge_index = $snmp_bridge_2_index . '.' . $bridge_port['value'];
@@ -287,7 +287,7 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 					break 2;
 				}
 			}
-ciscotools_log('Mac address :'.$mac_oid .' 4:bridgeport: '.print_r($bridge_port, true). ' 5:intindex: '.print_r($bridge2index, true));
+mactrack_log('Mac address :'.$mac_oid .' 4:bridgeport: '.print_r($bridge_port, true). ' 5:intindex: '.print_r($bridge2index, true));
 
 			unset($bridge2index); // clear the value to avoid problem
 			unset($bridge_port); // clear the value to avoid problem
@@ -327,7 +327,7 @@ ciscotools_log('Mac address :'.$mac_oid .' 4:bridgeport: '.print_r($bridge_port,
 				date("YmdHis")."') ON DUPLICATE KEY UPDATE date='".
 				date("YmdHis")."'"
 				);
-//ciscotools_log('write to DB: '.$mysql);
+//mactrack_log('write to DB: '.$mysql);
 			$ret = db_execute($mysql);
 			$cnt++;
 		}
@@ -382,9 +382,16 @@ function get_vlan( $hostrecord_array ) {
 		}
 	}
 
-	ciscotools_log('vlan array :'.print_r($vlan, true) );
+	mactrack_log('vlan array :'.print_r($vlan, true) );
 	
 	return $vlan;
+}
+
+function mactrack_log( $text ){
+    $dolog = read_config_option('ciscotools_mactrack_log_debug');
+    if( $dolog ){
+		cacti_log( $text, false, 'MACTRACK' );
+	}
 }
 
 ?>

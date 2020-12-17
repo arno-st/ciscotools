@@ -30,7 +30,7 @@
  * @param   integer $status:    the status code - View the meaning on the file display_upgrade.php
  * @return  boolean $flag:      true if successful, false otherwise
  */
-function ciscotools_upgrade_table($deviceID, $action, $status=0)
+function ciscotools_upgrade_table($deviceID, $action, $status=UPGRADE_STATUS_PENDING)
 {
     $sqlFind = "SELECT plugin_ciscotools_upgrade.id, plugin_ciscotools_upgrade.host_id, 
                 plugin_ciscotools_upgrade.status
@@ -49,7 +49,7 @@ function ciscotools_upgrade_table($deviceID, $action, $status=0)
                     $sqlQuery = "INSERT INTO plugin_ciscotools_upgrade (host_id, status) VALUES (".$deviceID.", ".$status.")";
                     $sqlExec = db_execute($sqlQuery);
                 }
-                else if((cacti_sizeof($result) == 1) && ($result[0]['status'] == '21'))
+                else if((cacti_sizeof($result) == 1) && ($result[0]['status'] == 'UPGRADE_STATUS_NEED_RECHECK'))
                 {
                     $sqlQuery = "UPDATE plugin_ciscotools_upgrade SET status=" . $status . " " . $sqlWhere;
                     $sqlExec = db_execute($sqlQuery);

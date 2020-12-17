@@ -64,20 +64,20 @@ function ciscotools_upgrade_step_one($deviceID)
     // CHECK MODEL
     if(ciscotools_upgrade_check_model($infos['device']['type']) === false)
     {   // Model unsupported
-        ciscotools_upgrade_table($deviceID, 'status', 9);
+        ciscotools_upgrade_table($deviceID, 'status', UPGRADE_STATUS_UNSUPORTED);
         return false;
     }
 
     if($infos['device']['can_be_upgraded'] != 'on')
     {   // Upgrade disabled
-        ciscotools_upgrade_table($deviceID, 'update', 10);
+        ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_UPGRADE_DISABLED);
         return false;
     }
 
     // CHECK VERSION
     if(ciscotools_upgrade_check_version($deviceID, $infos) === false)
     {   // Error checking version
-        ciscotools_upgrade_table($deviceID, 'update', 11);
+        ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_CHECKING_ERROR);
         return false;
     }
 
@@ -85,7 +85,7 @@ function ciscotools_upgrade_step_one($deviceID)
     $tftpAddress = read_config_option('ciscotools_default_tftp');
     if(ciscotools_upgrade_check_tftp($deviceID, $tftpAddress) === false)
     {   // Error checking TFTP address
-        ciscotools_upgrade_table($deviceID, 'update', 12);
+        ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_TFTP_DOWN);
         return false;
     }
 
@@ -117,7 +117,7 @@ function ciscotools_upgrade_step_two($deviceID)
     $uploadStatus = ciscotools_upgrade_check_upload($infos['device'], $infos['snmp']);
     if($uploadStatus === 'error')
     {   // Stuck in upload
-        ciscotools_upgrade_table($deviceID, 'update', 13);
+        ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_UPLOAD_STUCK);
         ciscotools_log("[ERROR] Upgrade: " . $infos['device']['description'] . " seems to be stuck in upload!");
         return false;
     }
@@ -130,7 +130,7 @@ function ciscotools_upgrade_step_two($deviceID)
         $stream = create_ssh($deviceID);
         if($stream === false)
         {
-            ciscotools_upgrade_table($deviceID, 'update', 18);
+            ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_SSH_ERROR);
             return false;
         }
         if(ssh_write_stream($stream, "conf t") === false) return false; // Enter in conf mode
@@ -142,20 +142,20 @@ function ciscotools_upgrade_step_two($deviceID)
 
         if($infos['device']['can_be_rebooted'] === 'on')
         {   // REBOOT
-            ciscotools_upgrade_table($deviceID, 'update', 4);
+            ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_REBOOTING);
 
             // SSH REBOOT
             if(ssh_write_stream($stream, "reload\r\n") === false) return false;
             ssh_read_stream($stream);
         }
-        else ciscotools_upgrade_table($deviceID, 'update', 6);
+        else ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_NEED_REBOOT);
     }
     else if($infos['model']['mode'] === 'install')
     {   // IOS-XE like Cisco 9x00
         $stream = create_ssh($deviceID);
         if($stream === false)
         {
-            ciscotools_upgrade_table($deviceID, 'update', 18);
+            ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_SSH_ERROR);
             return false;
         }
 
@@ -164,8 +164,8 @@ function ciscotools_upgrade_step_two($deviceID)
         if(ssh_write_stream($stream, "install add file flash:" . $infos['model']['image']) === false) return false;
         ssh_read_stream($stream);
 
-        if($infos['device']['can_be_rebooted'] === 'on') ciscotools_upgrade_table($deviceID, 'update', 3);
-        else ciscotools_upgrade_table($deviceID, 'update', 7);
+        if($infos['device']['can_be_rebooted'] === 'on') ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_ACTIVATING);
+        else ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_NEED_COMMIT);
     }
     return true;
 }
@@ -187,11 +187,11 @@ function ciscotools_upgrade_step_three($deviceID)
     $tftpAddress = read_config_option('ciscotools_default_tftp');
     if(ciscotools_upgrade_check_tftp($deviceID, $tftpAddress) === false)
     {   // Error checking TFTP address
-        ciscotools_upgrade_table($deviceID, 'update', 12);
+        ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_TFTP_DOWN);
         return false;
     }
 
-    if($infos['device']['can_be_rebooted'] != 'on') ciscotools_upgrade_table($deviceID, 'update', 21); // Must be activated and comitted!
+    if($infos['device']['can_be_rebooted'] != 'on') ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_NEED_RECHECK); // Must be activated and comitted!
 
     // OIDs
     $snmpCopyEntry      = "1.3.6.1.4.1.9.9.96.1.1.1.1";    // ccCopyEntry
@@ -215,7 +215,7 @@ function ciscotools_upgrade_step_three($deviceID)
     // Status - 1 to begin
     ciscotools_upgrade_snmp_set($infos['snmp']['version'], $infos['device']['hostname'], $snmpCopyStatus . $infos['snmp']['session'], "i", "1", $infos['snmp']);
 
-    ciscotools_upgrade_table($deviceID, 'update', 4);
+    ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_REBOOTING);
     return true;
 }
 /* ==================================================== */
@@ -245,7 +245,7 @@ function ciscotools_upgrade_step_four($deviceID)
         $imageCheck = ciscotools_upgrade_check_image($deviceID, $infos['device']['hostname'], $infos['snmp'], $infos['model']['image']);
         if($imageCheck === false)
         {   // Error in installation
-            ciscotools_upgrade_table($device['host_id'], 'update', 15);
+            ciscotools_upgrade_table($device['host_id'], 'update', UPGRADE_STATUS_INFO_ERROR);
             return false;
         }
     }
@@ -257,7 +257,7 @@ function ciscotools_upgrade_step_four($deviceID)
         $stream = create_ssh($deviceID);
         if($stream === false)
         {
-            ciscotools_upgrade_table($deviceID, 'update', 18);
+            ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_SSH_ERROR);
             return false;
         }
         if(ssh_write_stream($stream, "term l 0") === false) return false;
@@ -291,7 +291,7 @@ function ciscotools_upgrade_step_four($deviceID)
         $regexInstall = '/\[[0-9]{1}\|install_op_boot\]:\s(END SUCCESS)/';
         if(!preg_match($regexInstall, $installSummary, $result))
         {
-            ciscotools_upgrade_table($device['host_id'], 'update', 15);
+            ciscotools_upgrade_table($device['host_id'], 'update', UPGRADE_STATUS_INFO_ERROR);
             ciscotools_log("[ERROR] Upgrade: " . $infos['device']['description'] . " was not correctly upgraded!");
             return false;
         }
@@ -300,7 +300,7 @@ function ciscotools_upgrade_step_four($deviceID)
         close_ssh($stream);
     }
     ciscotools_log('[DEBUG] Upgrade: upgrade succeeded for ' . $infos['device']['description'] . "!");
-    ciscotools_upgrade_table($deviceID, 'update', 20);
+    ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_UPDATE_OK);
 }
 /* ==================================================== */
 

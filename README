@@ -35,3 +35,4 @@
 1.2.3 Added more detailed choice for guest access on CiscoTools tab
 1.2.4 Addapted the mactracking to use snmp V3
 1.2.5 When click on the version of the backup, it exported as text file
+1.2.6 Add mactrack specific logging, change some way on how it works

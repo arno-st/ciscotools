@@ -25,7 +25,8 @@ include_once($config['base_path'] . '/plugins/extenddb/ssh2.php');
 
 function ciscotools_displayUpgrade()
 {
-    global $upgradeActions, $config, $item_rows;
+    global $upgradeActions, $config, $item_rows, $statusText, $statusColor;
+	
     $upgradeActions = array(
 		1	=> __("Recheck"),
 		2	=> __("Upgrade"),
@@ -92,11 +93,14 @@ function ciscotools_displayUpgrade()
 		case "upg_hostname":
 			$sortColumn = "host.hostname";
 			break;
+		case "upg_type":
+			$sortColumn = "host.type";
+			break;
 		case "upg_status":
 			$sortColumn = "plugin_ciscotools_upgrade.status";
 			break;
 		default:
-			$sortColumn = '';
+			$sortColumn = "plugin_ciscotools_upgrade.status";
 			break;
 	}
 	$sortDirection	= get_request_var("sort_direction");
@@ -140,7 +144,7 @@ function ciscotools_displayUpgrade()
 
 	// SQL Query
      $sqlQuery = "SELECT host.id as 'id',
-                host.description as 'description', host.hostname as 'hostname', plugin_ciscotools_upgrade.status as 'status'
+                host.description as 'description', host.hostname as 'hostname', plugin_ciscotools_upgrade.status as 'status', host.type as 'type'
                 FROM host, plugin_ciscotools_upgrade
                 WHERE host.id=plugin_ciscotools_upgrade.host_id
                 $sqlWhere
@@ -158,6 +162,7 @@ function ciscotools_displayUpgrade()
         $devices[$id]['description'] = $entry['description'];
         $devices[$id]['hostname'] = $entry['hostname'];
         $devices[$id]['status'] = $entry['status'];
+        $devices[$id]['type'] = $entry['type'];
 	}
 
     if($upgradeExport == "1")
@@ -197,15 +202,15 @@ function ciscotools_displayUpgrade()
 			{
 				// Recheck
 				case 1:
-					ciscotools_upgrade_table($value, 'update', 21);
+					ciscotools_upgrade_table($value, 'update', UPGRADE_STATUS_NEED_RECHECK);
 					break;
 				// Upgrade
 				case 2:
-					ciscotools_upgrade_table($value, 'update', 0);
+					ciscotools_upgrade_table($value, 'update', UPGRADE_STATUS_PENDING);
 					break;
 				// Put in test
 				case 3:
-					ciscotools_upgrade_table($value, 'update', 19);
+					ciscotools_upgrade_table($value, 'update', UPGRADE_STATUS_IN_TEST);
 					break;
 			}
 		}
@@ -235,6 +240,12 @@ function ciscotools_displayUpgrade()
 			"sort"		=> "ASC",
 			"tip"		=> __('The IP address of the device')
 		),
+		"upg_type"	=> array(
+			"display"	=> __("Type"),
+			"align"		=> "left",
+			"sort"		=> "ASC",
+			"tip"		=> __('The type of the device')
+		),
 		"upg_status"    => array(
 			"display"	=> __("Status"),
 			"align"		=> "left",
@@ -243,58 +254,6 @@ function ciscotools_displayUpgrade()
 		)
 	);
 	
-	// Status text depending of status number
-    $statusText = array(
-        '0'     => 'Pending',
-        '1'     => 'Checking Device',
-        '2'     => 'Uploading & Upgrading',
-        '3'     => 'Activating (Install mode)',
-        '4'     => 'Rebooting',
-        '5'     => 'Need to be upgraded',
-        '6'     => 'Need to be rebooted',
-        '7'     => 'Need to be activated & committed manually',
-        '8'     => 'Error in table "upgrade"',
-        '9'     => 'Model unsupported',
-        '10'    => 'Upgrade disabled',
-        '11'    => 'Error checking version',
-        '12'    => 'TFTP server seems to be down',
-        '13'    => 'Stuck in upload',
-        '14'    => 'Error in upload',
-        '15'    => 'Error getting device infos',
-        '16'    => 'Error getting SNMP infos',
-        '17'    => 'Error getting image infos',
-        '18'    => 'Error SSH',
-        '19'    => 'In test',
-        '20'    => 'Up to date',
-        '21'    => 'Recheck'
-    );
-
-	// Text color depending of status number
-    $statusColor = array(
-        "0"     => "inherit",
-        "1"     => "blue",
-        "2"     => "blue",
-        "3"     => "blue",
-        "4"     => "blue",
-        "5"     => "orange",
-        "6"     => "orange",
-        "7"     => "orange",
-        "8"     => "red",
-        "9"     => "red",
-        "10"    => "red",
-        "11"    => "red",
-        "12"    => "red",
-        "13"    => "red",
-        "14"    => "red",
-        "15"    => "red",
-        "16"    => "red",
-        "17"    => "red",
-        "18"    => "red",
-        "19"    => "violet",
-        "20"    => "green",
-        "21"    => "inherit"
-    );
-
     $refresh['seconds'] = '300';
     $refresh['page']    = 'ciscotools_tab.php?action=upgrade&header=false';
     $refresh['logout']  = 'false';
@@ -508,10 +467,11 @@ function ciscotools_displayUpgrade()
 		{	// Put records in table
             $color = "; color:" . $statusColor[$row['status']] . ";";
 			form_alternate_row('line' . $row['id'], true);	// Alternate color
-			form_selectable_cell(filter_value($row['id'], get_request_var('filter'), "../../host.php?action=edit&id=" . $row['id']), $row['id']);			// ID
-			form_selectable_cell(filter_value($row['description'], get_request_var('filter')), $row['id'], $color);                                         // Description
-			form_selectable_cell(filter_value($row['hostname'], get_request_var('filter')), $row['id'], $color);                                            // Hostname
-			form_selectable_cell(filter_value($row['status'] . " – " . $statusText[$row['status']], get_request_var('filter')), $row['id'], $color);		// Status
+			form_selectable_cell(filter_value($row['id'], get_request_var('filter'), "../../host.php?action=edit&id=" . $row['id']), $row['id']); // ID
+			form_selectable_cell(filter_value($row['description'], get_request_var('filter')), $row['id'], $color); // Description
+			form_selectable_cell(filter_value($row['hostname'], get_request_var('filter')), $row['id'], $color); // Hostname
+			form_selectable_cell(filter_value($row['type'], get_request_var('filter')), $row['id'], $color); // type
+			form_selectable_cell(filter_value($row['status'] . " – " . $statusText[$row['status']], get_request_var('filter')), $row['id'], $color); // Status
 			form_checkbox_cell($row['description'], $row['id']);
 			form_end_row();
 		}

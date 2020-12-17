@@ -62,25 +62,25 @@ if(!$queryQueue)
 
 foreach($queryQueue as $device)
 {   // Devices in queue
-    if($device['status'] == '0')
+    if($device['status'] == UPGRADE_STATUS_PENDING)
     {   // If device is pending > begin the first process
-        ciscotools_upgrade_table($device['host_id'], 'update', 1);
+        ciscotools_upgrade_table($device['host_id'], 'update', UPGRADE_STATUS_CHECKING);
 
         // Get infos + uploading new image
         $upgradeStepOne = ciscotools_upgrade_step_one($device['host_id']);
         if($upgradeStepOne === false) continue;
     }
-    else if($device['status'] == '2')
+    else if($device['status'] == UPGRADE_STATUS_UPLOADING)
     {   // Check upload image + delete old images
         $upgradeStepTwo = ciscotools_upgrade_step_two($device['host_id']);
         if($upgradeStepTwo === false) continue;
     }
-    else if($device['status'] == '3')
+    else if($device['status'] == UPGRADE_STATUS_ACTIVATING)
     {   // Install mode: activating image
         $upgradeStepThree = ciscotools_upgrade_step_three($device['host_id']);
         if($upgradeStepThree === false) continue;
     }
-    else if($device['status'] == '4')
+    else if($device['status'] == UPGRADE_STATUS_REBOOTING)
     {   // Verify installation
         $upgradeStepFour = ciscotools_upgrade_step_four($device['host_id']);
         if($upgradeStepFour === false) continue;
