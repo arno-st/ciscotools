@@ -177,7 +177,7 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 	);
 //mactrack_log('1: get itf type: '.print_r($intf_type_array, true) );
 
-mactrack_log('2: get trunk array');
+//mactrack_log('2: get trunk array');
 	// Check if it's a trunk, if so make vlan_name as trunk and id 0
 	$intf_trunk_array = cacti_snmp_walk( $hostrecord_array['hostname'], $hostrecord_array['snmp_community'], 
 		$snmp_is_trunk, $hostrecord_array['snmp_version'],
@@ -203,7 +203,7 @@ mactrack_log('2: get trunk array');
 			$hostrecord_array['snmp_priv_passphrase'],
 			$hostrecord_array['snmp_priv_protocol'] );
 //mactrack_log('3: mac address array: '.print_r($mac_address_array, true). ' for vlan: '.$vlan_array[$vlankey]['id']);
-mactrack_log('3: mac address array');
+//mactrack_log('3: mac address array');
 
 			$bridge_port_array = cacti_snmp_walk( $hostrecord_array['hostname'], $snmp_community, 
 			$snmp_bridge_port_number, $hostrecord_array['snmp_version'],
@@ -214,7 +214,7 @@ mactrack_log('3: mac address array');
 			$hostrecord_array['snmp_priv_protocol']
 			); // return a value used to get index of internet interface, and oid with the mac
 //mactrack_log('4: get bridge port array: '.print_r($bridge_port_array,true). ' for vlan: '.$vlan_array[$vlankey]['id'] );
-mactrack_log('4: get bridge port array');
+//mactrack_log('4: get bridge port array');
 			if( empty($bridge_port_array) ) continue; // if no bridge port, no mac, go further
 		
 		// get interface index from bridge port for all interface in that vlan
@@ -227,7 +227,7 @@ mactrack_log('4: get bridge port array');
 			$hostrecord_array['snmp_priv_protocol']);
 		 
 //mactrack_log('5: get bridge2index array: '.print_r($intf_index_array, true));
-mactrack_log('5: get bridge2index array');
+//mactrack_log('5: get bridge2index array');
 	} else {
 			$snmp_context = 'vlan-'.$vlan_array[$vlankey]['id'];
 			$mac_address_array = cacti_snmp_walk( $hostrecord_array['hostname'], '', $snmp_mac_list, 
@@ -238,9 +238,11 @@ mactrack_log('5: get bridge2index array');
 			$hostrecord_array['snmp_priv_passphrase'],
 			$hostrecord_array['snmp_priv_protocol'],
 			$snmp_context );
-
+/*
+17/12/2020 17:19:38 - MACTRACK 3: mac address array: Array ( [0] => Array ( [oid] => .1.3.6.1.2.1.17.4.3.1.1.0.8.227.255.252.40 [value] => 00 08 E3 FF FC 28 ) [1] => Array ( [oid] => .1.3.6.1.2.1.17.4.3.1.1.104.202.228.99.150.97 [value] => 68 CA E4 63 96 61 ) ) for vlan: 537
+*/
 //mactrack_log('3: mac address array: '.print_r($mac_address_array, true). ' for vlan: '.$vlan_array[$vlankey]['id']);
-mactrack_log('3: mac address array');
+//mactrack_log('3: mac address array');
 			$bridge_port_array = cacti_snmp_walk( $hostrecord_array['hostname'], '', 
 			$snmp_bridge_port_number, $hostrecord_array['snmp_version'],
 			$hostrecord_array['snmp_username'],
@@ -251,7 +253,7 @@ mactrack_log('3: mac address array');
 			$snmp_context); // return a value used to get index of internet interface, and oid with the mac
 				
 //mactrack_log('4: get bridge port array: '.print_r($bridge_port_array,true). ' for vlan: '.$vlan_array[$vlankey]['id'] );
-mactrack_log('4: get bridge port array');
+//mactrack_log('4: get bridge port array');
 			if( empty($bridge_port_array) ) continue; // if no bridge port, no mac, go further
 			
 			// get interface index from bridge port for all interface in that vlan
@@ -264,7 +266,7 @@ mactrack_log('4: get bridge port array');
 			$hostrecord_array['snmp_priv_protocol'],
 			$snmp_context );
 //mactrack_log('5: get bridge2index array: '.print_r($intf_index_array, true));
-mactrack_log('5: get bridge2index array');
+//mactrack_log('5: get bridge2index array');
 		} // return an array OID and MAC as human readable
 
 //*** save to the return array, so to the match for all MAC on a VLAN
@@ -276,6 +278,7 @@ mactrack_log('5: get bridge2index array');
 			preg_match($regex, $mac_address['oid'], $matches, PREG_OFFSET_CAPTURE, 0);
 			$mac_oid = $snmp_bridge_port_number . $matches[0][0];
 
+			if( strlen($mac_address['value']) < 17) continue; // 68 CA E4 63 96 61 -> 17 is the total length
 			$mac_array[$cnt]['mac_address'] = str_replace( ' ', '', $mac_address['value']); // and remove space inside
 			if( !is_string($mac_array[$cnt]['mac_address']) ) continue; // drop record if not correct
 			$mac_array[$cnt]['vlan_id'] = $vlan_array[$vlankey]['id'];

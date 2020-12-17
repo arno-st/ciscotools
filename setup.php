@@ -767,6 +767,16 @@ function ciscotools_utilities_list () {
 	<?php
 	form_end_row();
 	form_alternate_row();
+	?>
+		<td class="textArea">
+			<a href='utilities.php?action=ciscotools_add_oui'>Ciscotools import OUI file</a>
+		</td>
+		<td class="textArea">
+			Import OUI file into DB, OUI has to be: macaddress.io-db.json on ciscotools directory
+		</td>
+	<?php
+	form_end_row();
+	form_alternate_row();
 	
 	?>
 		<td class="textArea">
@@ -786,9 +796,12 @@ function ciscotools_utilities_list () {
 			Change, add or remove an image entry on the Ciscotools Image table.
 		</td>
 	<?php
+	
 }
 
 function ciscotools_utilities_action ($action) {
+	global $config;
+	
 	if ($action == 'ciscotools_retention') {
 		purge_backup();
 		include_once('./include/top_header.php');
@@ -797,6 +810,28 @@ function ciscotools_utilities_action ($action) {
 	} else if ($action == 'ciscotools_purge') {
 		cacti_log( 'Remove all backup', false, 'CISCOTOOLS' );
 		db_execute( 'TRUNCATE TABLE plugin_ciscotools_backup' );
+		include_once('./include/top_header.php');
+		utilities();
+		include_once('./include/bottom_footer.php');
+	} else if ( $action == 'ciscotools_add_oui' ) {
+		$fp = fopen($config['base_path'] . '/plugins/ciscotools/macaddress.io-db.json', "r");
+		if( $fp !== false ) {
+			do {
+				$json_data = fgets($fp);
+				if( strlen($json_data) <= 1 ) continue;
+				$mac_vendor = json_decode($json_data, true );
+				$mac_vendor['companyName'] = str_replace ("'", " ", $mac_vendor['companyName']);
+				$mac_vendor['oui'] = str_replace (":", "", $mac_vendor['oui'] ); // remove the :
+				$sqlexec = "INSERT INTO plugin_ciscotools_oui (`oui`, `companyname`, `countrycode`) VALUE 
+				('".$mac_vendor['oui']."', '".$mac_vendor['companyName']."', '".$mac_vendor['countryCode']."')
+				ON DUPLICATE KEY UPDATE 
+				oui='".$mac_vendor['oui']."',
+				companyname='".$mac_vendor['companyName']."',
+				countrycode='".$mac_vendor['countryCode']."'";
+
+				db_execute($sqlexec);
+			} while( !feof($fp) );
+		}
 		include_once('./include/top_header.php');
 		utilities();
 		include_once('./include/bottom_footer.php');
