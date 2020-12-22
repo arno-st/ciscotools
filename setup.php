@@ -694,7 +694,7 @@ function ciscotools_poller_bottom () {
 // purge poller, test is made only when we should do a backup, to avoid overload of the pooler bottom
 			purge_backup();
 		} else {
-			cacti_log('Backup is running', false, 'CISCOTOOLS');
+			cacti_log('Backup is running: ', false, 'CISCOTOOLS');
 		}
 	}
 	
@@ -724,9 +724,8 @@ function ciscotools_poller_bottom () {
 			purge_mac();
 
 		} else {
-			cacti_log('Mac Check is running', false, 'CISCOTOOLS');
+			cacti_log('Mac Check is running '.date( 'Y-m-d H:m:s', $lastMacPoller), false, 'CISCOTOOLS');
 		}
-		set_config_option('ciscotools_mac_lastPoll', time()); // Set the last poll for an mac check
 	}
 
 }

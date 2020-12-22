@@ -57,11 +57,6 @@ function ciscotools_displaymac() {
 			'pageset' => true,
 			'default' => ''
 			),
-		'trunk' => array(
-			'filter' => FILTER_VALIDATE_BOOLEAN,
-			'pageset' => true,
-			'default' => '0'
-			),
 		'description' => array(
 			'filter' => FILTER_DEFAULT,
 			'pageset' => true,
@@ -92,7 +87,6 @@ table plugin_ciscotools_mactrack
 	$mac_address       = str_replace(array(':','-','.'), '', get_request_var_request("mac_address"));
 	$ip_address       = get_request_var_request("ip_address");
 	$description       = get_request_var_request("description");
-	$trunk       = get_request_var_request("trunk");
 	
 	if ($switch != '') {
 		$sql_where .= " AND " . "host.description LIKE '%$switch%'";
@@ -105,13 +99,6 @@ table plugin_ciscotools_mactrack
 	}
 	if ($description != '') {
 		$sql_where .= " AND " . "mac.description LIKE '%$description%'";
-	}
-	if ($trunk == '1') {
-		$sql_where .= " AND " . "mac.vlan_id = '0'";
-	} else {
-		unset_request_var('trunk');
-		$trunk = '0';
-		$sql_where .= " AND " . "mac.vlan_id != '0'";
 	}
 
 	general_header();
@@ -164,7 +151,6 @@ table plugin_ciscotools_mactrack
 		strURL += '&ip_address=' + $('#ip_address').val();
 		strURL += '&mac_address=' + $('#mac_address').val();
 		strURL += '&description=' + $('#description').val();
-		strURL += '&trunk=' + $('#trunk').val();
 		strURL += '&rows=' + $('#rows').val();
 		
 		loadPageNoHeader(strURL);
@@ -213,12 +199,6 @@ table plugin_ciscotools_mactrack
 						<input type="text" name="description" size="20" value="<?php print get_request_var("description");?>">
 					</td>
 					<td nowrap style='white-space: nowrap;' width="1">
-				<td nowrap style='white-space: nowrap;' width="1">
-					&nbsp;Display Trunk:&nbsp;
-				</td>
-				<td width="1">
-					<input type="checkbox" name="trunk" value="1" <?php ($trunk=='1')?print " checked":print "" ?>>
-				</td>
 				<td nowrap style='white-space: nowrap;' width="1">
 					&nbsp;Rows:&nbsp;
 					</td>

@@ -75,6 +75,7 @@ if(empty($nb_process)) $nb_process=2; // just in case the configuration is not s
 	foreach( $hostrecord_array as $hostrecord ) {
 		cacti_log('Pool mac for host:'.$hostrecord['description'].' process:'.$process_no, TRUE, 'MACTRACK');
 		get_mac_table($hostrecord);
+		cacti_log('End Pool mac for host:'.$hostrecord['description'].' process:'.$process_no, TRUE, 'MACTRACK');		
 	}
 	
 	$still_process = read_config_option('ciscotools_mac_running');
@@ -83,5 +84,8 @@ if(empty($nb_process)) $nb_process=2; // just in case the configuration is not s
 		set_config_option('ciscotools_mac_running', $still_process ); // set the end of the process
 	}
 	
-	if( $still_process == 0 ) cacti_log( 'Mac polling ended', false, 'CISCOTOOLS');
+	if( $still_process == 0 ) {
+		set_config_option('ciscotools_mac_lastPoll', time()); // Set the last poll for an mac check
+		cacti_log( 'Mac polling ended', false, 'CISCOTOOLS');
+	}
 ?>

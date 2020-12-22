@@ -179,6 +179,7 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 
 //mactrack_log('2: get trunk array');
 	// Check if it's a trunk, if so make vlan_name as trunk and id 0
+	// drop it, no need 2020.12.22
 	$intf_trunk_array = cacti_snmp_walk( $hostrecord_array['hostname'], $hostrecord_array['snmp_community'], 
 		$snmp_is_trunk, $hostrecord_array['snmp_version'],
 		$hostrecord_array['snmp_username'],
@@ -228,7 +229,7 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 		 
 //mactrack_log('5: get bridge2index array: '.print_r($intf_index_array, true));
 //mactrack_log('5: get bridge2index array');
-	} else {
+		} else {
 			$snmp_context = 'vlan-'.$vlan_array[$vlankey]['id'];
 			$mac_address_array = cacti_snmp_walk( $hostrecord_array['hostname'], '', $snmp_mac_list, 
 			$hostrecord_array['snmp_version'],
@@ -278,7 +279,8 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 			preg_match($regex, $mac_address['oid'], $matches, PREG_OFFSET_CAPTURE, 0);
 			$mac_oid = $snmp_bridge_port_number . $matches[0][0];
 
-			if( strlen($mac_address['value']) < 17) continue; // 68 CA E4 63 96 61 -> 17 is the total length
+			if( false === filter_var( str_replace( ' ', ':', $mac_address['value']), FILTER_VALIDATE_MAC ) ) continue;
+			
 			$mac_array[$cnt]['mac_address'] = str_replace( ' ', '', $mac_address['value']); // and remove space inside
 			if( !is_string($mac_array[$cnt]['mac_address']) ) continue; // drop record if not correct
 			$mac_array[$cnt]['vlan_id'] = $vlan_array[$vlankey]['id'];
@@ -286,7 +288,8 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 
 			// get interface index from bridge port
 			// dosen't match!! $key to big, look for mac on OID
-			// do a do-while onthe OID of the bridge_port_array to find the MAC address, then get the value to parse the bridge2index OID to get the port_index in the value
+			// do a do-while on the OID of the bridge_port_array to find the MAC address, 
+			// then get the value to parse the bridge2index OID to get the port_index in the value
 			$mac_array[$cnt]['port_index'] = '';
 			$bridge2index = '';
 			foreach($bridge_port_array as $bridge_port ) {
@@ -299,9 +302,9 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 				}
 			}
 //mactrack_log('Mac address :'.$mac_oid .' 4:bridgeport: '.print_r($bridge_port, true). ' 5:intindex: '.print_r($bridge2index, true));
-
 			unset($bridge2index); // clear the value to avoid problem
 			unset($bridge_port); // clear the value to avoid problem
+
 			// get interface index from bridge port
 			$type_index = $snmp_interfaces_type.'.'.$mac_array[$cnt]['port_index'];
 			foreach( $intf_type_array as $type4index ){
@@ -317,17 +320,16 @@ function get_mac_vlan( $hostrecord_array, $vlan_array ) {
 			// Check if it's a trunk, if so make vlan_name as trunk and id 0
 			$trunk_index = $snmp_is_trunk.'.'.$mac_array[$cnt]['port_index'];
 			foreach( $intf_trunk_array as $trunk4index ){
-
-				if( $trunk4index['oid'] != $trunk_index) continue;
-				$intf_trunk = $trunk4index['value'];
-				if( $intf_trunk == '1' ) {
-					$mac_array[$cnt]['vlan_id']= '0';
-					$mac_array[$cnt]['vlan_name'] = 'trunk';
+				if( $trunk4index['oid'] == $trunk_index ) {
+					if( $trunk4index['value'] == 1){
+						$mac_array[$cnt]['vlan_id']= '0';
+					}
+					break;
 				}
-				break;
 			}
 			unset($trunk4index); // clear the value to avoid problem
-
+			if( $mac_array[$cnt]['vlan_id'] == 0 ) continue; // trunk, drop not record to DB
+			
 			$mysql = ("INSERT INTO plugin_ciscotools_mactrack (host_id,mac_address,port_index,vlan_id,vlan_name,date) 
 				VALUES ('".
 				$hostrecord_array['id']."','".
