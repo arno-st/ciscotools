@@ -196,7 +196,7 @@ function ciscotools_setup_tables() {
 	api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_mactrack', $data);
 
 	// create unique record for host/mac on port
-	$mysql = "ALTER IGNORE TABLE `plugin_ciscotools_mactrack` ADD INDEX `record` ( `host_id`, `mac_address`, `port_index`)";
+	$mysql = "ALTER IGNORE TABLE `plugin_ciscotools_mactrack` ADD UNIQUE `record` ( `host_id`, `mac_address`, `port_index`)";
 	$ret = db_execute($mysql);
 
 	// add mac info into the host table

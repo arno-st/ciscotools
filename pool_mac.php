@@ -73,9 +73,9 @@ if(empty($nb_process)) $nb_process=2; // just in case the configuration is not s
 	$hostrecord_array = db_fetch_assoc($mysql);
     // do pooling for all device discovered
 	foreach( $hostrecord_array as $hostrecord ) {
-		cacti_log('Pool mac for host:'.$hostrecord['description'].' process:'.$process_no, TRUE, 'MACTRACK');
+//		cacti_log('Pool mac for host:'.$hostrecord['description'].' process:'.$process_no, TRUE, 'MACTRACK');
 		get_mac_table($hostrecord);
-		cacti_log('End Pool mac for host:'.$hostrecord['description'].' process:'.$process_no, TRUE, 'MACTRACK');		
+//		cacti_log('End Pool mac for host:'.$hostrecord['description'].' process:'.$process_no, TRUE, 'MACTRACK');		
 	}
 	
 	$still_process = read_config_option('ciscotools_mac_running');
