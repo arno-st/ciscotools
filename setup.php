@@ -513,6 +513,11 @@ function ciscotools_api_device_new($hostrecord_array) {
 	global $config;
 
 	// don't do it for disabled
+	if( !array_key_exists('disabled', $hostrecord_array ) || !array_key_exists('id', $hostrecord_array) ) {
+		ciscotools_log('Recu: '. print_r($hostrecord_array, true) );
+		return $hostrecord_array;
+	}
+
 	if( $hostrecord_array['disabled'] == 'on'  ) {
 		return $hostrecord_array;
 	}
