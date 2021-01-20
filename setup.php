@@ -514,13 +514,15 @@ function ciscotools_api_device_new($hostrecord_array) {
 
 	// don't do it for disabled
 	if( !array_key_exists('disabled', $hostrecord_array ) || !array_key_exists('id', $hostrecord_array) ) {
-		ciscotools_log('Recu: '. print_r($hostrecord_array, true) );
+		ciscotools_log('Not valid call: '. print_r($hostrecord_array, true) );
 		return $hostrecord_array;
 	}
 
 	if( $hostrecord_array['disabled'] == 'on'  ) {
 		return $hostrecord_array;
 	}
+
+	ciscotools_log('Enter Ciscotools: '.$hostrecord_array['description'].'('.$hostrecord_array['id'].')');
 
 // We need to check if it's a cisco device
 	$hostrecord_array['snmp_sysDescr'] = db_fetch_cell_prepared("SELECT snmp_sysDescr
@@ -578,6 +580,8 @@ function ciscotools_api_device_new($hostrecord_array) {
 	}
 
 	sql_save($hostrecord_array, 'host');
+
+	ciscotools_log('End Ciscotools' );
 	
 	return $hostrecord_array;
 }
