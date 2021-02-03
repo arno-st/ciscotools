@@ -66,9 +66,24 @@ function purge_mac(){
 }
 
 function get_mac_table($hostrecord_array) {
+	$snmpsysobjid = ".1.3.6.1.2.1.1.2.0"; // ObjectID
+	$snmpsysdescr = ".1.3.6.1.2.1.1.1.0"; // system description
 	// make a test if it's a device like WiFi controler (snmp_sysObjectID=iso.3.6.1.4.1.9.1.1069) call another set of function.
 	// spécial php code is used for that
-	
+	if( empty($hostrecord_array['snmp_sysObjectID']) ) {
+		// parse device to find snmp_sysObjectID: OID: .1.3.6.1.4.1.9.1.2134
+		// on DB iso.3.6.1.4.1.9.1.2134'
+		$host_data = cacti_snmp_get( $hostrecord_array['hostname'], $hostrecord_array['snmp_community'], $snmpsysobjid, 
+		$hostrecord_array['snmp_version'], $hostrecord_array['snmp_username'], $hostrecord_array['snmp_password'], 
+		$hostrecord_array['snmp_auth_protocol'], $hostrecord_array['snmp_priv_passphrase'], $hostrecord_array['snmp_priv_protocol'],
+		$hostrecord_array['snmp_context'] );
+		
+		$regex = '~.[0-9].*\.([0-9].*)~';
+		preg_match( $regex, $host_data, $result ); // extract the OID of the switch number from the snmp query
+		$hostrecord_array['snmp_sysObjectID'] = 'iso.3.6.1.4.1.9.1.'.$result[1];
+		extdb_log('host_data: '.$hostrecord_array['snmp_sysObjectID']);
+	}
+
 	switch( $hostrecord_array['snmp_sysObjectID'] ) {
 		case 'iso.3.6.1.4.1.9.1.1069':
 			get_wifi_mac_table($hostrecord_array);

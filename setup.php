@@ -777,6 +777,16 @@ function ciscotools_utilities_list () {
 	form_alternate_row();
 	?>
 		<td class="textArea">
+			<a href='utilities.php?action=ciscotools_force_backup'>Force backup</a>
+		</td>
+		<td class="textArea">
+			Force a backup on all devices.
+		</td>
+	<?php
+	form_end_row();
+	form_alternate_row();
+	?>
+		<td class="textArea">
 			<a href='utilities.php?action=ciscotools_add_oui'>Ciscotools import OUI file</a>
 		</td>
 		<td class="textArea">
@@ -785,7 +795,6 @@ function ciscotools_utilities_list () {
 	<?php
 	form_end_row();
 	form_alternate_row();
-	
 	?>
 		<td class="textArea">
 			<a href='utilities.php?action=ciscotools_purge'>Remove all backup</a>
@@ -812,6 +821,11 @@ function ciscotools_utilities_action ($action) {
 	
 	if ($action == 'ciscotools_retention') {
 		purge_backup();
+		include_once('./include/top_header.php');
+		utilities();
+		include_once('./include/bottom_footer.php');
+	}  else if ($action == 'ciscotools_force_backup') {
+		cacti_log( 'force all backup', false, 'CISCOTOOLS' );
 		include_once('./include/top_header.php');
 		utilities();
 		include_once('./include/bottom_footer.php');
