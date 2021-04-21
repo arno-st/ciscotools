@@ -30,7 +30,7 @@
  * @param   integer $status:    the status code - View the meaning on the file display_upgrade.php
  * @return  boolean $flag:      true if successful, false otherwise
  */
-function ciscotools_upgrade_table($deviceID, $action, $status=UPGRADE_STATUS_PENDING)
+function ciscotools_upgrade_table($deviceID, $action, $status=UPGRADE_STATUS_PENDING, $image='')
 {
     $sqlFind = "SELECT plugin_ciscotools_upgrade.id, plugin_ciscotools_upgrade.host_id, 
                 plugin_ciscotools_upgrade.status
@@ -46,17 +46,17 @@ function ciscotools_upgrade_table($deviceID, $action, $status=UPGRADE_STATUS_PEN
         case 'add':
                 if(!$result)
                 {
-                    $sqlQuery = "INSERT INTO plugin_ciscotools_upgrade (host_id, status) VALUES (".$deviceID.", ".$status.")";
+                    $sqlQuery = "INSERT INTO plugin_ciscotools_upgrade (host_id, status, image) VALUES (".$deviceID.", ".$status.", '".$image."')";
                     $sqlExec = db_execute($sqlQuery);
                 }
-                else if((cacti_sizeof($result) == 1) && ($result[0]['status'] == 'UPGRADE_STATUS_NEED_RECHECK'))
+                else if((cacti_sizeof($result) == 1) ) //&& ($result[0]['status'] == 'UPGRADE_STATUS_NEED_RECHECK'))
                 {
-                    $sqlQuery = "UPDATE plugin_ciscotools_upgrade SET status=" . $status . " " . $sqlWhere;
+                    $sqlQuery = "UPDATE plugin_ciscotools_upgrade SET status=" . $status . ",image='".$image."' " . $sqlWhere;
                     $sqlExec = db_execute($sqlQuery);
                 }
             break;
         
-        case 'update':
+        case 'update': // start upgrade of the device
                 if(cacti_sizeof($result) == 1)
                 {
                     $sqlQuery = "UPDATE plugin_ciscotools_upgrade SET status=" . $status . " " . $sqlWhere;
@@ -71,6 +71,7 @@ function ciscotools_upgrade_table($deviceID, $action, $status=UPGRADE_STATUS_PEN
                 $sqlExec = db_execute($sqlQuery);
             }
             break;
+			
         case 'force':
             if(cacti_sizeof($result) == 0)
             {
@@ -79,7 +80,7 @@ function ciscotools_upgrade_table($deviceID, $action, $status=UPGRADE_STATUS_PEN
             }
             else if(cacti_sizeof($result) == 1)
             {
-                $sqlQuery = "UPDATE plugin_ciscotools_upgrade SET status=" . $status . " " . $sqlWhere;
+                $sqlQuery = "UPDATE plugin_ciscotools_upgrade SET status=" . $status ." " . $sqlWhere;
                 $sqlExec = db_execute($sqlQuery);
             }
             break;

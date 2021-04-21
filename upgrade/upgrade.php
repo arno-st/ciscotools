@@ -27,11 +27,11 @@
 * +-----------+
 * You need a file named 'activate.txt' in your TFTP folder!
 * This file must contain the following text:
-* !BEGIN
-* !save before activating
-* do wr
-* !activate without prompt
-* install activate prompt-level none
+!BEGIN
+!save before activating
+do wr
+!activate without prompt
+install activate prompt-level none
 * +-----------+
 * | ATTENTION |
 * +-----------+
@@ -57,43 +57,33 @@ include_once($config['base_path'] . '/plugins/ciscotools/upgrade/upgrade_infos.p
  * @return  boolean true if successful, false otherwise
  */
 function ciscotools_upgrade_step_one($deviceID)
-{   // GET INFOS
+{   // GET INFOS from DB on the current device
     $infos = ciscotools_upgrade_get_infos($deviceID);
-    if($infos === false) return false;
+    if($infos === false) {
+	    // Error in installation
+		ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_INFO_ERROR);
+		return false;
+	}
 
-    // CHECK MODEL
-    if(ciscotools_upgrade_check_model($infos['device']['type']) === false)
-    {   // Model unsupported
-        ciscotools_upgrade_table($deviceID, 'status', UPGRADE_STATUS_UNSUPORTED);
-        return false;
-    }
-
+	// check if device can be upgrade automaticaly or not.
     if($infos['device']['can_be_upgraded'] != 'on')
-    {   // Upgrade disabled
+    {   // Upgrade disabled, if device is not allowing upgrade, just bypass it
         ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_UPGRADE_DISABLED);
         return false;
     }
 
-    // CHECK VERSION
-    if(ciscotools_upgrade_check_version($deviceID, $infos) === false)
-    {   // Error checking version
-        ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_CHECKING_ERROR);
-        return false;
-    }
-
-    // TFTP CHECK
+    // TFTP CHECK, if it's up and running
     $tftpAddress = read_config_option('ciscotools_default_tftp');
     if(ciscotools_upgrade_check_tftp($deviceID, $tftpAddress) === false)
     {   // Error checking TFTP address
         ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_TFTP_DOWN);
         return false;
     }
-
+	
     // IMAGE UPLOAD
     ciscotools_upgrade_upload_image($deviceID, $infos, $tftpAddress);
     return true;
 }
-/* ==================================================== */
 
 /** ================= STEP TWO =================
  * Upload verification, old images deletion and potential reboot
@@ -105,53 +95,50 @@ function ciscotools_upgrade_step_one($deviceID)
  * @return  boolean true if successful, false otherwise
  */
 function ciscotools_upgrade_step_two($deviceID)
-{   // OID
-    $snmpStatus = "1.3.6.1.4.1.9.9.10.1.2.1.1.8";   // ciscoFlashCopyStatus
-    $oidReload = "1.3.6.1.4.1.9.2.9.9.0";           // reload
-
+{
     // GETTING INFOS
     $infos = ciscotools_upgrade_get_infos($deviceID);
-    if($infos === false) return false;
+    if($infos === false) {
+	    // Error in installation
+		ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_INFO_ERROR);
+		return false;
+	}
 
     // Check upload status
-    $uploadStatus = ciscotools_upgrade_check_upload($infos['device'], $infos['snmp']);
+    $uploadStatus = ciscotools_upgrade_check_upload($infos);
     if($uploadStatus === 'error')
     {   // Stuck in upload
         ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_UPLOAD_STUCK);
-        ciscotools_log("[ERROR] Upgrade: " . $infos['device']['description'] . " seems to be stuck in upload!");
+ciscotools_log("[ERROR] Upgrade: " . $infos['device']['description'] . " seems to be stuck in upload!");
         return false;
     }
-    else if($uploadStatus === 'progress') return false; // Still uploading
+    else if($uploadStatus === 'progress') return false; 
+	else if($uploadStatus === false ) return false;// other error
     
     // Erasing old images
-    if($infos['model']['mode'] == 'bundle')
-    {   // Bundle mode
-        ciscotools_upgrade_delete_images($infos['device'], $infos['model']['image']); // Delete old images
+    if($infos['model']['mode'] == 'bundle') {
+		// Bundle mode
+        ciscotools_upgrade_delete_images($infos); // Delete old images
         $stream = create_ssh($deviceID);
         if($stream === false)
         {
             ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_SSH_ERROR);
             return false;
         }
-        if(ssh_write_stream($stream, "conf t") === false) return false; // Enter in conf mode
-        ssh_read_stream($stream);
-        if(ssh_write_stream($stream, "boot system flash:" . $infos['model']['image']) === false) return false; // Set the boot path-list
-        ssh_read_stream($stream);
-        if(ssh_write_stream($stream, "do wr") === falsE) return false; // Write memory
-        ssh_read_stream($stream);
 
         if($infos['device']['can_be_rebooted'] === 'on')
         {   // REBOOT
             ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_REBOOTING);
 
             // SSH REBOOT
-            if(ssh_write_stream($stream, "reload\r\n") === false) return false;
-            ssh_read_stream($stream);
+            if(ssh_write_stream($stream, "reload\r\n") === false) return false; // \r\n is to confirm reload
+            $reloadresult = ssh_read_stream($stream);
+ciscotools_log("device: ".$infos['device']['description']." Reload result : ".print_r($reloadresult, true) );
         }
         else ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_NEED_REBOOT);
-    }
-    else if($infos['model']['mode'] === 'install')
-    {   // IOS-XE like Cisco 9x00
+    } else if($infos['model']['mode'] === 'install') {
+		// IOS-XE like Cisco 9x00
+		// erase is done after reload
         $stream = create_ssh($deviceID);
         if($stream === false)
         {
@@ -161,29 +148,39 @@ function ciscotools_upgrade_step_two($deviceID)
 
         if(ssh_write_stream($stream, "wr") === false) return false;
         ssh_read_stream($stream);
+		// activate the new version
         if(ssh_write_stream($stream, "install add file flash:" . $infos['model']['image']) === false) return false;
-        ssh_read_stream($stream);
+        $installStatus = ssh_read_stream($stream);
+ciscotools_log("device: ".$infos['device']['description']." Install status : ".print_r($installStatus, true) );
+		if( stripos($installStatus, 'INSTALL-3-OPERATION_ERROR_MESSAGE' ) !== false ) {
+			ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_ACTIVATING_ERROR);
+			return false;
+		}
 
         if($infos['device']['can_be_rebooted'] === 'on') ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_ACTIVATING);
         else ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_NEED_COMMIT);
     }
     return true;
 }
-/* ==================================================== */
 
 /** ================= STEP THREE =================
  * Install mode: activating the new image
+ * Bundle mode: reboot (if $force is true)
  *
  * Perform an activation of the new image through SNMP
  *
  * @param   integer $deviceID:  the ID of the device (host.id)
  * @return  boolean true if successful, false otherwise
  */
-function ciscotools_upgrade_step_three($deviceID)
-{
+function ciscotools_upgrade_step_three($deviceID) {
     // DEVICE INFOS
     $infos = ciscotools_upgrade_get_infos($deviceID);
-    if($infos === false) return false;
+    if($infos === false) {
+	    // Error in installation
+		ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_INFO_ERROR);
+		return false;
+	}
+
     $tftpAddress = read_config_option('ciscotools_default_tftp');
     if(ciscotools_upgrade_check_tftp($deviceID, $tftpAddress) === false)
     {   // Error checking TFTP address
@@ -191,8 +188,10 @@ function ciscotools_upgrade_step_three($deviceID)
         return false;
     }
 
-    if($infos['device']['can_be_rebooted'] != 'on') ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_NEED_RECHECK); // Must be activated and comitted!
-
+    if( ($infos['device']['can_be_rebooted'] != 'on') ) {
+		ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_NEED_COMMIT); // Must be activated and comitted!
+	}
+/*	
     // OIDs
     $snmpCopyEntry      = "1.3.6.1.4.1.9.9.96.1.1.1.1";    // ccCopyEntry
     $snmpCopyProtocol   = $snmpCopyEntry . ".2";            // ccCopyProtocol       
@@ -214,7 +213,7 @@ function ciscotools_upgrade_step_three($deviceID)
     ciscotools_upgrade_snmp_set($infos['snmp']['version'], $infos['device']['hostname'], $snmpCopyFileName . $infos['snmp']['session'], "s", "activate.txt", $infos['snmp']);
     // Status - 1 to begin
     ciscotools_upgrade_snmp_set($infos['snmp']['version'], $infos['device']['hostname'], $snmpCopyStatus . $infos['snmp']['session'], "i", "1", $infos['snmp']);
-
+*/
     ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_REBOOTING);
     return true;
 }
@@ -230,11 +229,14 @@ function ciscotools_upgrade_step_three($deviceID)
  * @param   integer $deviceID:  the ID of the device (host.id)
  * @return  boolean true if successful, false otherwise
  */
-function ciscotools_upgrade_step_four($deviceID)
-{
+function ciscotools_upgrade_step_four($deviceID) {
     // DEVICE INFOS
     $infos = ciscotools_upgrade_get_infos($deviceID);
-    if($infos === false) return false;
+    if($infos === false) {
+	    // Error in installation
+		ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_INFO_ERROR);
+		return false;
+	}
 
     // Check reboot
     $ping = exec("ping -c 1 -s 64 -t 64 -w 1 " . $infos['device']['hostname']);
@@ -242,22 +244,19 @@ function ciscotools_upgrade_step_four($deviceID)
 
     if($infos['model']['mode'] == 'bundle')
     {   // Check image boot
-        $imageCheck = ciscotools_upgrade_check_image($deviceID, $infos['device']['hostname'], $infos['snmp'], $infos['model']['image']);
+        $imageCheck = ciscotools_upgrade_check_image( $infos);
         if($imageCheck === false)
-        {   // Error in installation
-            ciscotools_upgrade_table($device['host_id'], 'update', UPGRADE_STATUS_INFO_ERROR);
+        {   // Error in check image, message allready display
             return false;
         }
-    }
-    else if($infos['model']['mode'] == 'install')
-    {
+    } else if($infos['model']['mode'] == 'install') {
         $regexNewImage = '/(\d{2}\.\d{2}\.\d{2})/'; // Catch new version number
         if(!preg_match($regexNewImage, $infos['model']['image'], $newVersion)) return false;
 
         $stream = create_ssh($deviceID);
         if($stream === false)
         {
-            ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_SSH_ERROR);
+			// do nothing, mabye not ready after reboot
             return false;
         }
         if(ssh_write_stream($stream, "term l 0") === false) return false;
@@ -279,30 +278,74 @@ function ciscotools_upgrade_step_four($deviceID)
             }
         }
         
-        if(ssh_write_stream($stream, 'delete /f /r flash:*' . $oldVersion . '.SPA.pkg') === false) return false;
-        ssh_read_stream($stream);
-        if(ssh_write_stream($stream, 'delete /f /r flash:*' . $newVersion[0] . '.SPA.conf') === false) return false;
-        ssh_read_stream($stream);
-        if(ssh_write_stream($stream, 'wr') === false) return false;
-        ssh_read_stream($stream);
-        
         if(ssh_write_stream($stream, 'show install log') === false) return false;
         $installSummary = ssh_read_stream($stream);
         $regexInstall = '/\[[0-9]{1}\|install_op_boot\]:\s(END SUCCESS)/';
         if(!preg_match($regexInstall, $installSummary, $result))
         {
             ciscotools_upgrade_table($device['host_id'], 'update', UPGRADE_STATUS_INFO_ERROR);
-            ciscotools_log("[ERROR] Upgrade: " . $infos['device']['description'] . " was not correctly upgraded!");
+ciscotools_log("[ERROR] Upgrade: " . $infos['device']['description'] . " was not correctly upgraded!");
             return false;
         }
         if(ssh_write_stream($stream, "install commit") === false) return false;
+        $installcommit = ssh_read_stream($stream);
+ciscotools_log("device: ".$infos['device']['description'].' install commit:' .print_r($installcommit, true) );
+
+        if(ssh_write_stream($stream, 'install remove inactive') === false) return false;
+        $installremove = ssh_read_stream($stream);
+ciscotools_log("device: ".$infos['device']['description'].' install remove:' .print_r($installremove, true) );
+        if(ssh_write_stream($stream, 'y') === false) return false; // was wr
         ssh_read_stream($stream);
+
         close_ssh($stream);
     }
-    ciscotools_log('[DEBUG] Upgrade: upgrade succeeded for ' . $infos['device']['description'] . "!");
+ciscotools_log('[DEBUG] Upgrade: upgrade succeeded for ' . $infos['device']['description'] . "!");
     ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_UPDATE_OK);
 }
-/* ==================================================== */
 
-/* ======================================================================================= */
+/** ================= Reboot/commit =================
+ * Install mode: activating the new image
+ * Bundle mode: reboot 
+ *
+ * Perform an activation of the new image through SNMP
+ *
+ * @param   integer $deviceID:  the ID of the device (host.id)
+ * @return  boolean true if successful, false otherwise
+ */
+function ciscotools_upgrade_step_force_reboot($deviceID){
+    // GETTING INFOS
+    $infos = ciscotools_upgrade_get_infos($deviceID);
+    if($infos === false) {
+	    // Error in installation
+		ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_INFO_ERROR);
+		return false;
+	}
+ciscotools_log("reboot: ". $infos['device']['description']);
+
+	// open thw ssh stream to the device
+	$stream = create_ssh($deviceID);
+    if($stream === false)
+    {
+        ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_SSH_ERROR);
+        return false;
+    }
+    ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_REBOOTING);
+
+
+    if($infos['model']['mode'] == 'bundle') {   
+		// Bundle mode
+        if(ssh_write_stream($stream, "wr") === false) return false; // Write memory
+        ssh_read_stream($stream);
+        // SSH REBOOT
+        if(ssh_write_stream($stream, "reload\r\n") === false) return false;
+        ssh_read_stream($stream);
+	} else if($infos['model']['mode'] === 'install')
+    {   
+		// IOS-XE like Cisco 9x00
+        if(ssh_write_stream($stream, "install activate prompt-level none") === false) return false;
+        $activate = ssh_read_stream($stream);
+ciscotools_log("device: ".$infos['device']['description'].' install activate return: ', print_r($activate, true) );
+		}
+	return true;
+}
 ?>

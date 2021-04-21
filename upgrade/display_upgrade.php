@@ -23,16 +23,18 @@
 */
 include_once($config['base_path'] . '/plugins/extenddb/ssh2.php');
 
-function ciscotools_displayUpgrade()
-{
-    global $upgradeActions, $config, $item_rows, $statusText, $statusColor;
+function ciscotools_displayUpgrade() {
+    global $upgradeActions, $config, $item_rows;
+
 	
     $upgradeActions = array(
 		1	=> __("Recheck"),
 		2	=> __("Upgrade"),
 		3	=> __("Put in test"),
+		4	=> __("Reboot/Commit"),
+		5	=> __("Delete"),
     );
-	
+
     /* ================= input validation ================= */
     input_validate_input_number(get_request_var("page"));
     input_validate_input_number(get_request_var("rows"));
@@ -63,6 +65,15 @@ function ciscotools_displayUpgrade()
     {
         set_request_var("upgradeExport", sanitize_search_string(get_request_var("upgradeExport")));
     }
+	// clean up sort_column 
+	if (isset_request_var('sort_column')) {
+		set_request_var('sort_column', sanitize_search_string(get_request_var("sort_column")) );
+	}
+	
+	// clean up sort direction 
+	if (isset_request_var('sort_direction')) {
+		set_request_var('sort_direction', sanitize_search_string(get_request_var("sort_direction")) );
+	}
 
 	// Remember search fields in session vars
     load_current_session_value("page", "sess_ciscotools_current_page", "1");			// Default:	1
@@ -72,15 +83,17 @@ function ciscotools_displayUpgrade()
 	load_current_session_value("upgradeAction", "sess_ciscotools_upgradeAction", '');	// Default:	''
     load_current_session_value("upgradeError", "sess_ciscotools_upgradeError", "0");	// Default:	0
     load_current_session_value("upgradeExport", "sess_ciscotools_upgradeExport", "0");  // Default: 0
+	load_current_session_value("sort_column", "sess_ciscotools_sort_column", "upg_status");
+	load_current_session_value("sort_direction", "sess_ciscotools_sort_direction", "ASC");
 
 	/* ===================== SQL Query ===================== */
 	// SQLWhere - Where instructions in SQL
 	$sqlWhere       = "";
-	$description    = get_request_var_request("description");
-    $status 		= get_request_var_request("status");
-	$upgradeAction  = get_request_var_request("upgradeAction");
-    $upgradeError	= get_request_var_request("upgradeError");
-    $upgradeExport  = get_request_var_request("upgradeExport");
+	$description    = get_request_var("description");
+    $status 		= get_request_var("status");
+	$upgradeAction  = get_request_var("upgradeAction");
+    $upgradeError	= get_request_var("upgradeError");
+    $upgradeExport  = get_request_var("upgradeExport");
 	$sortColumn		= get_request_var("sort_column");
 	switch($sortColumn)
 	{	// Precise table and field
@@ -96,9 +109,10 @@ function ciscotools_displayUpgrade()
 		case "upg_type":
 			$sortColumn = "host.type";
 			break;
-		case "upg_status":
-			$sortColumn = "plugin_ciscotools_upgrade.status";
+		case "upg_image":
+			$sortColumn = "plugin_ciscotools_upgrade.image";
 			break;
+		case "upg_status":
 		default:
 			$sortColumn = "plugin_ciscotools_upgrade.status";
 			break;
@@ -107,17 +121,30 @@ function ciscotools_displayUpgrade()
 	
 	if($upgradeError === "1")
 	{	// Sort all error status
-		$sqlWhere .= " AND " . "plugin_ciscotools_upgrade.status IN ('8', '9', '10', '11', '12', '13', '14', '15', '16', '17', '18')";
+		$sqlWhere .= " AND " . "plugin_ciscotools_upgrade.status IN ('"
+			."','".UPGRADE_STATUS_TABLE_ERROR
+			."','".UPGRADE_STATUS_UNSUPORTED
+			."','".UPGRADE_STATUS_UPGRADE_DISABLED
+			."','".UPGRADE_STATUS_CHECKING_ERROR
+			."','".UPGRADE_STATUS_TFTP_DOWN
+			."','".UPGRADE_STATUS_UPLOAD_STUCK
+			."','".UPGRADE_STATUS_UPLOAD_ERROR
+			."','".UPGRADE_STATUS_INFO_ERROR
+			."','".UPGRADE_STATUS_SNMP_ERROR
+			."','".UPGRADE_STATUS_IMAGE_INFO_ERROR
+			."','".UPGRADE_STATUS_SSH_ERROR
+			."','".UPGRADE_STATUS_ACTIVATING_ERROR
+			."')";
 	}
-	if($description != "")
+	if($description != '')
     {	// Sort all descriptions like URL parameter
         $sqlWhere .= " AND " . "host.description like '%$description%'";
     }
-    if($status != "" && $status != -1)
+    if($status != '' && $status != -1)
     {	// Sort all the status equal URL parameter
         $sqlWhere .= " AND " . "plugin_ciscotools_upgrade.status = $status";
 	}
-	if($sortColumn != "")
+	if($sortColumn != '')
 	{	// Order by URL parameter depends on the sort column
 		$sort = " ORDER BY " . $sortColumn;
 	}
@@ -136,22 +163,26 @@ function ciscotools_displayUpgrade()
     $totalRows = db_fetch_cell($sqlTotalRow);
 
 	// If nb rows is -1 > set it to the default
-    if(get_request_var("rows") == "-1") $perRow = read_config_option("num_rows_table");
-	else $perRow = get_request_var("rows");
+	/* if the number of rows is -1, set it to the default */
+	if (get_request_var('rows') == -1) {
+		$rows = read_config_option('num_rows_table');
+	} else {
+		$rows = get_request_var('rows');
+	}
 	
-    $page = ($perRow*(get_request_var("page")-1));
-    $sqlLimit = $page . "," . $perRow;
+    $page = ($rows*(get_request_var("page")-1));
+    $sqlLimit = $page . "," . $rows;
 
 	// SQL Query
      $sqlQuery = "SELECT host.id as 'id',
-                host.description as 'description', host.hostname as 'hostname', plugin_ciscotools_upgrade.status as 'status', host.type as 'type'
+                host.description as 'description', host.hostname as 'hostname', plugin_ciscotools_upgrade.image as image, plugin_ciscotools_upgrade.status as 'status', host.type as 'type'
                 FROM host, plugin_ciscotools_upgrade
                 WHERE host.id=plugin_ciscotools_upgrade.host_id
                 $sqlWhere
                 $sort
                 LIMIT " . $sqlLimit;
     $result = db_fetch_assoc($sqlQuery); // Query result
-	/* ===================================================== */
+ciscotools_log('Upgrade Pages: '.print_r($sqlQuery, true) );
 
 	// Sorting devices in array
     $devices = array();
@@ -161,6 +192,7 @@ function ciscotools_displayUpgrade()
         $devices[$id]['id'] = $id;
         $devices[$id]['description'] = $entry['description'];
         $devices[$id]['hostname'] = $entry['hostname'];
+        $devices[$id]['image'] = $entry['image'];
         $devices[$id]['status'] = $entry['status'];
         $devices[$id]['type'] = $entry['type'];
 	}
@@ -189,12 +221,12 @@ function ciscotools_displayUpgrade()
         }
         header("Location: " . $url);
     }
+	
 	/* ====================== Actions ====================== */
-	if(!empty($upgradeAction))
-    {
+	if(!empty($upgradeAction)) {
 		include_once($config['base_path'] . '/plugins/ciscotools/upgrade/upgrade.php');	// Include functions of upgrade.php
 		$param = explode('?', $_SERVER['REQUEST_URI'], 2);	// Explode URL to get parameters
-		if(!preg_match_all("/&chk_([0-9]+)/", $param[1], $devicesID)) header("Location: ciscotools_tab.php?action=upgrade");	// Check if devices were selected
+		if(!preg_match_all("/&chk_([0-9]+)/", $param[1], $devicesID)) header("Location: ciscotools_tab.php?action=upgrade&5");	// Check if devices were selected
 			
 		foreach($devicesID[1] as $key => $value)
 		{
@@ -212,9 +244,17 @@ function ciscotools_displayUpgrade()
 				case 3:
 					ciscotools_upgrade_table($value, 'update', UPGRADE_STATUS_IN_TEST);
 					break;
+				// reboot or commit the device
+				case 4:
+					ciscotools_upgrade_table($value, 'update',UPGRADE_STATUS_FORCE_REBOOT_COMMIT);
+					break;
+				// Delete device from upgrade table
+				case 5:
+					ciscotools_upgrade_table($value, 'delete' );
+					break;
 			}
 		}
-		header("Location: ciscotools_tab.php?action=upgrade");	// Redirect instantly
+		header("Location: ciscotools_tab.php?action=upgrade&0");	// Redirect instantly
 	}
 	/* ===================================================== */
 
@@ -246,6 +286,12 @@ function ciscotools_displayUpgrade()
 			"sort"		=> "ASC",
 			"tip"		=> __('The type of the device')
 		),
+		"upg_image"    => array(
+			"display"	=> __("Current Image"),
+			"align"		=> "left",
+			"sort"		=> "ASC",
+			"tip"		=> __('The current image of the device')
+		),
 		"upg_status"    => array(
 			"display"	=> __("Status"),
 			"align"		=> "left",
@@ -255,10 +301,11 @@ function ciscotools_displayUpgrade()
 	);
 	
     $refresh['seconds'] = '300';
-    $refresh['page']    = 'ciscotools_tab.php?action=upgrade&header=false';
+    $refresh['page']    = 'ciscotools_tab.php?action=upgrade&header=false&1';
     $refresh['logout']  = 'false';
 
     set_page_refresh($refresh);
+
 ?>
 
     <script type="text/javascript">
@@ -266,14 +313,14 @@ function ciscotools_displayUpgrade()
 	// Dynamic function (jQuery)
 	$(function() 
 	{
-		$("#upgradeDescription, #upgradeStatus, #upgradeRows, #upgradeError").change(function()
+		$("#description, #status, #rows, #upgradeError").change(function()
 		{	// When fields change > apply filter
-			loadPage(applyFilterChange());
+			loadPageNoHeader(applyFilterChange());
 		});
 
 		$("#upgradeRefresh").click(function()
 		{	// When 'Apply' button clicked > apply filter
-			loadPage(applyFilterChange());
+			loadPageNoHeader(applyFilterChange());
 		});
 
 		$("#upgradeClear").click(function()
@@ -296,12 +343,13 @@ function ciscotools_displayUpgrade()
     function applyFilterChange()
     {	// Filters
         strURL = "?action=upgrade";	// URL base
-        strURL += "&description=" + $("#upgradeDescription").val();	// Description param
-        strURL += "&status=" + $("#upgradeStatus").val();	// Status param
-        strURL += "&rows=" + $("#upgradeRows").val();	// Rows param
-		// UpgradeError param > sort all errors or no
+        strURL += "&description=" + $("#description").val();	// Description param
+        strURL += "&status=" + $("#status").val();	// Status param
+        strURL += "&rows=" + $("#rows").val();	// Rows param
+ 		// UpgradeError param > sort all errors or no
 		if($("#upgradeError").is(":checked")) strURL += "&upgradeError=1";
 		else strURL += "&upgradeError=0";
+		strURL += '&header=false&2';
         return strURL;  // return URL
     }
 
@@ -316,6 +364,8 @@ function ciscotools_displayUpgrade()
 		kill_session_var("sess_ciscotools_rows");
         kill_session_var("sess_ciscotools_upgradeError");
         kill_session_var("sess_ciscotools_upgradeExport");
+		kill_session_var("sess_ciscotools_sort_column");
+		kill_session_var("sess_ciscotools_sort_direction");
 
 		// Unset all parameters
         unset($_REQUEST['page']);
@@ -325,9 +375,11 @@ function ciscotools_displayUpgrade()
 		unset($_REQUEST['upgradeAction']);
         unset($_REQUEST['upgradeError']);
         unset($_REQUEST['upgradeExport']);
+		unset($_REQUEST["sort_column"]);
+		unset($_REQUEST["sort_direction"]);
         ?>
 		// Reload URL
-        strURL = "ciscotools_tab.php?action=upgrade";
+        strURL = "ciscotools_tab.php?action=upgrade&3";
         loadPage(strURL);
     }
 
@@ -393,7 +445,7 @@ function ciscotools_displayUpgrade()
 							<?php echo __("Description"); ?>
                         </td>
                         <td>
-                            <input type="text" placeholder="Enter a description" name="description" id="upgradeDescription" size="25" value="<?php echo get_request_var_request('description'); ?>">
+                            <input type="text" placeholder="Enter a description" name="description" id="description" size="25" value="<?php echo get_request_var('description'); ?>">
 							<i class="fa fa-search filter"></i>
 						</td>
 						<td>
@@ -409,12 +461,12 @@ function ciscotools_displayUpgrade()
                             <?php echo __("Status"); ?>
                         </td>
                         <td>
-                            <select name="status" id="upgradeStatus" nowrap style="white-space:nowrap;" width="1">
+                            <select name="status" id="status" nowrap style="white-space:nowrap;" width="1">
                                 <option value="-1"<?php if(get_request_var("status") == -1) {?> selected<?php }?>>None</option>
                                 <?php
-                                    foreach($statusText as $key => $value)
+                                    foreach(CISCOTLS_UPG_STATUS as $key => $value)
                                     {
-                                        echo "<option value='" . $key . "'"; if(get_request_var("status") == $key) { echo " selected"; } echo ">" . $key . " – " . $value . "</option>\n";
+                                        echo "<option value='" . $key . "'"; if(get_request_var("status") == $key ) { echo " selected"; } echo ">" . $key . " – " . $value['name'] . "</option>\n";
                                     }
                                 ?>
                             </select>
@@ -423,7 +475,7 @@ function ciscotools_displayUpgrade()
                             <?php echo __("Rows"); ?>
                         </td>
                         <td>
-                            <select name="rows" id="upgradeRows">
+                            <select name="rows" id="rows">
                                 <option value="-1"<?php if(get_request_var("rows") == "-1") {?> selected<?php }?>>Default</option>
                                 <?php
                                     if(sizeof($item_rows) > 0)
@@ -455,24 +507,32 @@ function ciscotools_displayUpgrade()
     html_start_box("", "100%", "", "3", "center", "");
 
     $displayDeviceText = ($totalRows>1) ? "Devices" : "Device";	// One or more > plural form
-    $nav = html_nav_bar("ciscotools_tab.php?action=upgrade", MAX_DISPLAY_PAGES, get_request_var("page"), $perRow, $totalRows, 12, __($displayDeviceText), "page", "main");
-    echo $nav;
+	
+	$URL = "ciscotools_tab.php?action=upgrade&description=".get_request_var('description')
+	."&status=".get_request_var('status')
+	."&rows=".get_request_var('rows')
+	."&upgradeError=".get_request_var('upgradeError');
+	
+    $nav = html_nav_bar($URL, MAX_DISPLAY_PAGES, get_request_var("page"), $rows, $totalRows, cacti_sizeof($displayDeviceText)+1, __($displayDeviceText), 'page', "main");
+
+   print $nav;
 
 	// Put checkboxes and redirect on upgrade tab
-    html_header_sort_checkbox($displayText, get_request_var('sort_column'), get_request_var('sort_direction'), false, "ciscotools_tab.php?action=upgrade");
+    html_header_sort_checkbox($displayText, get_request_var('sort_column'), get_request_var('sort_direction'), false, "ciscotools_tab.php?action=upgrade".get_request_var('description')."&7" );
 
     if(!empty($devices))
     {
-		foreach($devices as $row)
+		foreach($devices as $device)
 		{	// Put records in table
-            $color = "; color:" . $statusColor[$row['status']] . ";";
-			form_alternate_row('line' . $row['id'], true);	// Alternate color
-			form_selectable_cell(filter_value($row['id'], get_request_var('filter'), "../../host.php?action=edit&id=" . $row['id']), $row['id']); // ID
-			form_selectable_cell(filter_value($row['description'], get_request_var('filter')), $row['id'], $color); // Description
-			form_selectable_cell(filter_value($row['hostname'], get_request_var('filter')), $row['id'], $color); // Hostname
-			form_selectable_cell(filter_value($row['type'], get_request_var('filter')), $row['id'], $color); // type
-			form_selectable_cell(filter_value($row['status'] . " – " . $statusText[$row['status']], get_request_var('filter')), $row['id'], $color); // Status
-			form_checkbox_cell($row['description'], $row['id']);
+            $color = "; color:" . CISCOTLS_UPG_STATUS[$device['status']]['color'] . ";";
+			form_alternate_row('line' . $device['id'], true);	// Alternate color
+			form_selectable_cell(filter_value($device['id'], get_request_var('description'), "../../host.php?action=edit&id=" . $device['id']), $device['id']); // ID
+			form_selectable_cell(filter_value($device['description'], get_request_var('description')), $device['id'], $color); // Description
+			form_selectable_cell($device['hostname'], $device['id'], $color); // Hostname
+			form_selectable_cell($device['type'], $device['id'], $color); // type
+			form_selectable_cell($device['image'], $device['id'], $color); // image
+			form_selectable_cell(filter_value($device['status'] . " – " . CISCOTLS_UPG_STATUS[$device['status']]['name'], get_request_var('filter')), $device['id'], $color); // Status
+			form_checkbox_cell($device['description'], $device['id']);
 			form_end_row();
 		}
     }
@@ -482,7 +542,7 @@ function ciscotools_displayUpgrade()
     }
     
     html_end_box(false);
-    echo $nav;
+    print $nav;
 ?>
                 <div class="actionsDropdown">
                     <div>
@@ -541,13 +601,15 @@ function upgradeExport($devices)
         
         // SQL Query to catch all useful infos
         $sqlQuery = "SELECT host.id as 'id', host.description as 'description', host.hostname as 'ip', host.type as 'type', "
-                   ."plugin_ciscotools_image.image as 'default image', "
-                   ."plugin_ciscotools_upgrade.status as 'status number' "
-                   ."FROM host "
-                   ."LEFT JOIN plugin_ciscotools_image ON host.type = plugin_ciscotools_image.model "
-                   ."LEFT JOIN plugin_ciscotools_upgrade ON host.id = plugin_ciscotools_upgrade.host_id "
-                   ."WHERE host.id IN (" . $ids . ") "
-                   ."GROUP BY host.id ASC";
+					."plugin_ciscotools_image.image as 'default image', "
+					."plugin_ciscotools_upgrade.status as 'status', "
+					."plugin_ciscotools_upgrade.image as 'current image' "
+					."FROM host "
+					."LEFT JOIN plugin_extenddb_model ON host.type = plugin_extenddb_model.model "
+					."LEFT JOIN plugin_ciscotools_upgrade ON host.id = plugin_ciscotools_upgrade.host_id "
+					."LEFT JOIN plugin_ciscotools_image ON plugin_ciscotools_image.model_id=plugin_extenddb_model.id "
+					."WHERE host.id IN (" . $ids . ") "
+					."GROUP BY host.id ASC";
         $result = db_fetch_assoc($sqlQuery);
         if($result === false) return false;
 
@@ -557,15 +619,15 @@ function upgradeExport($devices)
 
         // Put data in $csv variable
         $flag = false;
-        foreach($result as $row)
+        foreach($result as $line)
         {
             if(!$flag)
             {
-                $csv .= implode(",", array_keys($row)) . "\r\n";
+                $csv .= implode(",", array_keys($line)) . "\r\n";
                 $flag = true;
             }
-            array_walk($row, __NAMESPACE__ . '\formatData');
-            $csv .= implode(",", array_values($row)) . "\r\n";
+            array_walk($line, __NAMESPACE__ . '\formatData');
+            $csv .= implode(",", array_values($line)) . "\r\n";
         }
 
         // Put data in file

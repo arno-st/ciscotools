@@ -35,59 +35,96 @@ include(dirname(__FILE__) . '/../../include/global.php');
 include_once($config['base_path'] . '/lib/utility.php');
 include_once($config['base_path'] . '/plugins/ciscotools/setup.php');
 
-/** ================= QUEUE CHECKING =================
- * Function called by poller. It checks if device(s) in queue and the status
- *
- * Check the queue table to see if devices are in queue and the status number
- * 0:   Pending and waiting step one
- * 1:   Upgrade beginning and uploading new image
- * 2:   Upload checking until a potential rebooting
- * 3:   Install mode: activating the new image
- * 4:   If rebooting, ping device and verify the installation
- *
- * @return  boolean true if successful, false otherwise
- */
-// Check upgrades for devices
-ciscotools_upgrade_device_check();
-    
-// Query to check if device is already in queue
-$sqlQuery = "SELECT id, host_id, status FROM plugin_ciscotools_upgrade";
+/* Check upgrades for devices
+   check all device that are not in an upgrade process, to see what status they are
+   device in a upgrade process don't had to be changed
+   it dosen't change or check device in upgrade process
+	
+1 UPGRADE_STATUS_PENDING
+2 UPGRADE_STATUS_CHECKING
+3 UPGRADE_STATUS_UPLOADING
+4 UPGRADE_STATUS_ACTIVATING
+5 UPGRADE_STATUS_REBOOTING
+22 UPGRADE_STATUS_NEED_RECHECK
+23 UPGRADE_STATUS_FORCE_REBOOT_COMMIT
+*/
+
+// this command is only started manually, it will fill the DB 1 time, then plugin_ciscotools_upgrade is the reference.
+// otherwise the status is check every time a image is changed
+//ciscotools_upgrade_device_check();
+
+// Query to check if devices are in queue, and need upgrade processing
+$sqlQuery = "SELECT id, host_id, status FROM plugin_ciscotools_upgrade WHERE status IN ('"
+			."','".UPGRADE_STATUS_PENDING
+			."','".UPGRADE_STATUS_CHECKING
+			."','".UPGRADE_STATUS_UPLOADING
+			."','".UPGRADE_STATUS_ACTIVATING
+			."','".UPGRADE_STATUS_REBOOTING
+			."','".UPGRADE_STATUS_FORCE_REBOOT_COMMIT
+			."','".UPGRADE_STATUS_NEED_RECHECK
+			."')";
 $queryQueue = db_fetch_assoc($sqlQuery);
-if(!$queryQueue)
-{
+if(!$queryQueue){
     set_config_option('ciscotools_upgrade_running', 'off');
-    cacti_log('Check upgrade ended', false, 'CISCOTOOLS');
+    cacti_log('Upgrade ended, none to process', false, 'CISCOTOOLS');
     return;
 }
+ciscotools_log("Start query queue: ".print_r($queryQueue, true));
 
+// process device that are in a ugrade process
+/*
+Status 1 UPGRADE_STATUS_PENDING
+Status 2 UPGRADE_STATUS_CHECKING
+Status 3 UPGRADE_STATUS_UPLOADING
+Status 4 UPGRADE_STATUS_ACTIVATING
+Status 5 UPGRADE_STATUS_REBOOTING
+Status 22 UPGRADE_STATUS_NEED_RECHECK
+Status 23 UPGRADE_STATUS_FORCE_REBOOT_COMMIT
+*/
 foreach($queryQueue as $device)
 {   // Devices in queue
-    if($device['status'] == UPGRADE_STATUS_PENDING)
-    {   // If device is pending > begin the first process
+ciscotools_log("id: ".$device['host_id']." status: ".$device['status']);
+    if($device['status'] == UPGRADE_STATUS_PENDING) {
+		// If device is pending > begin the first process
         ciscotools_upgrade_table($device['host_id'], 'update', UPGRADE_STATUS_CHECKING);
 
+ciscotools_log("Step One Start ".$device['host_id']);
         // Get infos + uploading new image
         $upgradeStepOne = ciscotools_upgrade_step_one($device['host_id']);
         if($upgradeStepOne === false) continue;
-    }
-    else if($device['status'] == UPGRADE_STATUS_UPLOADING)
-    {   // Check upload image + delete old images
+		
+    } else if($device['status'] == UPGRADE_STATUS_UPLOADING) {
+		// Check upload image + delete old images
+ciscotools_log("Step Two Start ".$device['host_id']);
         $upgradeStepTwo = ciscotools_upgrade_step_two($device['host_id']);
         if($upgradeStepTwo === false) continue;
-    }
-    else if($device['status'] == UPGRADE_STATUS_ACTIVATING)
-    {   // Install mode: activating image
+		
+    } else if($device['status'] == UPGRADE_STATUS_ACTIVATING) {
+		// Install mode: activating image
+ciscotools_log("Step Three Start ".$device['host_id']);
         $upgradeStepThree = ciscotools_upgrade_step_three($device['host_id']);
         if($upgradeStepThree === false) continue;
-    }
-    else if($device['status'] == UPGRADE_STATUS_REBOOTING)
-    {   // Verify installation
+		
+    } else if($device['status'] == UPGRADE_STATUS_REBOOTING) {
+		// Verify installation
+ciscotools_log("Step Four Start ".$device['host_id']);
         $upgradeStepFour = ciscotools_upgrade_step_four($device['host_id']);
         if($upgradeStepFour === false) continue;
-    }
+		
+    } else if($device['status'] == UPGRADE_STATUS_FORCE_REBOOT_COMMIT) {
+		// Install mode: activating image
+		// Bundle mode: reboot
+ciscotools_log("Step Reboot/Commit Start ".$device['host_id']);
+        $upgradeReboot = ciscotools_upgrade_step_force_reboot($device['host_id']);
+        if($upgradeReboot === false) continue;
+		
+    } else if($device['status'] == UPGRADE_STATUS_NEED_RECHECK ){
+ciscotools_log("Step Recheck Start ".$device['host_id']);
+		ciscotools_upgrade_device_check($device['host_id']);
+	}
 }
 set_config_option('ciscotools_upgrade_running', 'off'); // set the end of the process
-cacti_log('Check upgrade ended', false, 'CISCOTOOLS');
+cacti_log('Processing upgrade ended', false, 'CISCOTOOLS');
 /* ==================================================== */
 
  ?>

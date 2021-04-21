@@ -35,13 +35,13 @@ input_validate_input_number(get_request_var("page"));
 input_validate_input_number(get_request_var("rows"));
 /* ==================================================== */
 // Clean upgradeExport
-if(isset_request_var("model"))
-{
+if(!isempty_request_var("model")) {
     set_request_var("model", sanitize_search_string(get_request_var("model")));
-}
+} else unset_request_var("model");
+
 load_current_session_value("page", "sess_ciscotools_current_page", "1");    // Default:	1
 load_current_session_value("rows", "sess_ciscotools_rows", "-1");			// Default:	-1
-load_current_session_value("rows", "sess_ciscotools_model", "");			// Default:	''
+load_current_session_value("model", "sess_ciscotools_model", "");			// Default:	''
 
 switch(get_request_var('action'))
 {
@@ -53,6 +53,7 @@ switch(get_request_var('action'))
         
     case 'edit_image':
         top_header();
+		
         edit_image();
         bottom_footer();
         break;
@@ -66,8 +67,8 @@ switch(get_request_var('action'))
         break;
 }
 
-function display_image()
-{
+/**** Display image liste ***/
+function display_image() {
     global $config, $item_rows, $ciscotoolsImageActions;
 
     $filters = array(
@@ -204,11 +205,11 @@ function display_image()
 
     if(get_request_var('model') != '')
     {
-        $sqlWhere = " WHERE model LIKE " . db_qstr('%' . get_request_var('model') . '%');
+        $sqlWhere = " WHERE plugin_ciscotools_image.model_id=plugin_extenddb_model.id AND plugin_extenddb_model.model LIKE " . db_qstr('%' . get_request_var('model') . '%');
     }
-    $sqlTotalRow = "SELECT count(distinct(model))
-        FROM plugin_ciscotools_image".
-        $sqlWhere;
+    $sqlTotalRow = "SELECT count(distinct(model_id))
+					FROM plugin_ciscotools_image, plugin_extenddb_model".
+					$sqlWhere;
     $totalRows = db_fetch_cell($sqlTotalRow);
 
     if(get_request_var('rows') == '-1') $perRow = read_config_option('num_rows_table');
@@ -217,10 +218,12 @@ function display_image()
     $page = ($perRow*(get_request_var("page")-1));
     $sqlLimit = $page . "," . $perRow;
 
-    $sqlQuery = "SELECT *
+    $sqlQuery = "SELECT plugin_ciscotools_image.id as id, plugin_ciscotools_image.image as image, plugin_ciscotools_image.mode as mode, 
+		plugin_extenddb_model.model as model, plugin_ciscotools_image.model_id as model_id
         FROM plugin_ciscotools_image
+		INNER JOIN plugin_extenddb_model on plugin_ciscotools_image.model_id=plugin_extenddb_model.id
         $sqlWhere
-        ORDER BY id
+        ORDER BY plugin_ciscotools_image.id
         LIMIT " . $sqlLimit;
     $result = db_fetch_assoc($sqlQuery);
 
@@ -230,10 +233,11 @@ function display_image()
     print $nav;
     html_start_box('', '100%', '', '3', 'center', '');
 
-    html_header_checkbox(array(__('Model'), __('Image'), __('Mode')));
+    html_header_checkbox(array(__('Model'), __('Image'), __('Mode')) );
 
     if(!empty($result))
     {
+		// ref id is from plugin_ciscotools_image
         foreach($result as $item)
         {
 			$image = filter_value($item['model'], get_request_var('model'));
@@ -244,7 +248,6 @@ function display_image()
 
 				form_selectable_cell($item['image'], $item['image']);
 				form_selectable_cell($item['mode'], $item['mode']);
-				//form_selectable_cell($item['oid_sn'], $item['oid_sn']);
 				
 				form_checkbox_cell($item['image'], $item['id']);
 			form_end_row();
@@ -259,23 +262,24 @@ function display_image()
     form_end();
 }
 
-function image_form_actions()
-{
+/**** Action on image display ****/
+function image_form_actions() {
     global $ciscotoolsImageActions;
+	
     if(isset_request_var('selected_items'))
     {
-        if(isset_request_var('action_receivers'))
+      if(isset_request_var('action_receivers'))
         {
             $selected_items = sanitize_unserialize_selected_items(get_nfilter_request_var('selected_items'));
 
             if($selected_items != false)
             {
-                if(get_nfilter_request_var('drp_action') == '1')
+                if(get_nfilter_request_var('drp_action') == '1') // delete
                 {
                     db_execute('DELETE FROM plugin_ciscotools_image WHERE id IN (' . implode(',', $selected_items) . ')');
                     header('Location: display_image.php?header=false');
                 }
-                else if(get_nfilter_request_var('drp_action') == '2')
+                else if(get_nfilter_request_var('drp_action') == '2') // duplicate
                 {  
                     if(count($selected_items) > 1)
                     {
@@ -285,11 +289,20 @@ function image_form_actions()
                     else
                     {
                         $selected_item = implode(',', $selected_items);
-                        $sqlQuery = "SELECT * FROM plugin_ciscotools_image WHERE id='" . $selected_item . "'";
+						$sqlQuery = "SELECT plugin_ciscotools_image.id as id, plugin_extenddb_model.model as model, plugin_ciscotools_image.image as image, plugin_ciscotools_image.mode as mode, plugin_ciscotools_image.model_id,
+						plugin_ciscotools_image.command as command,
+						plugin_ciscotools_image.regex as regex
+									FROM plugin_extenddb_model 
+									LEFT JOIN plugin_ciscotools_image on plugin_ciscotools_image.model_id=plugin_extenddb_model.id 
+									WHERE plugin_ciscotools_image.id='" . $selected_item . "'";
                         $item = db_fetch_row_prepared($sqlQuery);
+						ciscotools_log("action: ".print_r( $item, true) );
                         $edit_image_db['model'] = $item['model'];
+                        $edit_image_db['model_id'] = $item['model_id'];
                         $edit_image_db['image'] = $item['image'];
                         $edit_image_db['mode'] = $item['mode'];
+                        $edit_image_db['command'] = $item['command'];
+                        $edit_image_db['regex'] = $item['regex'];
                         
                         edit_image($edit_image_db);
                     }
@@ -301,7 +314,7 @@ function image_form_actions()
     }
     else
     {
-        if(isset_request_var('action_receivers'))
+       if(isset_request_var('action_receivers'))
         {
             $selected_items = array();
             $list = '';
@@ -313,7 +326,10 @@ function image_form_actions()
                     /* ================= input validation ================= */
 					input_validate_input_number($id);
                     /* ==================================================== */
-                    $list .= '<li>' . html_escape(db_fetch_cell_prepared("SELECT model FROM plugin_ciscotools_image WHERE id = ?", array($id))) . '</li>';
+                    $list .= '<li>' . html_escape(db_fetch_cell_prepared("SELECT plugin_extenddb_model.model as model
+									FROM plugin_extenddb_model 
+									LEFT JOIN plugin_ciscotools_image on plugin_ciscotools_image.model_id=plugin_extenddb_model.id 
+									WHERE plugin_ciscotools_image.id = ?", array($id))) . '</li>';
                     $selected_items[] = $id;
                 }
             }
@@ -323,7 +339,7 @@ function image_form_actions()
 
             if(cacti_sizeof($selected_items))
             {
-                if(get_nfilter_request_var('drp_action') == '1')
+				if(get_nfilter_request_var('drp_action') == '1')
                 {
                     $msg = __n('Click \'Continue\' to delete the following model', 'Click \'Continue\' to delete following model', cacti_sizeof($selected_items));
                 }
@@ -365,16 +381,50 @@ function image_form_actions()
     }
 }
 
+/**** Edition part of the image field ****/
 function edit_image($image=null)
 {
     global $config;
 
+	/* ================= input validation ================= */
+	get_filter_request_var('id');
+    /* ==================================================== */
+    $id = (isset_request_var('id') ? get_request_var('id') : '0');
+    if($id)
+    {
+        $image = db_fetch_row_prepared("SELECT plugin_extenddb_model.model as model, plugin_ciscotools_image.image as image, plugin_ciscotools_image.mode as mode, 
+		plugin_ciscotools_image.id as id,  
+		plugin_ciscotools_image.model_id as model_id,
+		plugin_ciscotools_image.command as command,
+		plugin_ciscotools_image.regex as regex
+		FROM plugin_ciscotools_image INNER JOIN plugin_extenddb_model on plugin_extenddb_model.id=plugin_ciscotools_image.model_id WHERE plugin_ciscotools_image.id= ?", array($id));
+		
+        $header_label = __esc('Ciscotools Model [edit: %s ]', $image['model']);
+		$sqlfilter = " OR plugin_extenddb_model.model='".$image['model']."'";
+	}
+    else
+    {
+        $header_label = __('Ciscotools Model [new]');
+		$sqlfilter = '';
+    }
+  
+	$sqlQuery = "SELECT plugin_extenddb_model.model as model, plugin_extenddb_model.id as model_id
+				FROM plugin_extenddb_model 
+				LEFT JOIN plugin_ciscotools_image on plugin_ciscotools_image.model_id=plugin_extenddb_model.id 
+				WHERE plugin_ciscotools_image.model_id IS NULL" 
+				.$sqlfilter;
+    $result = db_fetch_assoc($sqlQuery);
+	foreach( $result as $model) {
+		$models_array[$model['model_id']] = $model['model'];
+	}
+
     $fields_image_edit = array(
-        'model' => array(
-            'method' => 'textbox',
+        'model_id' => array(
+            'method' => 'drop_array',
+			'array'  => $models_array,
             'friendly_name' => __('Model'),
             'description' => __('Exact model reference'),
-            'value' => '|arg1:model|',
+            'value' => '|arg1:model_id|',
             'max_length' => '64',
             'size' => 64
         ),
@@ -395,27 +445,32 @@ function edit_image($image=null)
             'max_length' => '7',
             'size' => 7
         ),
+        'command' => array(
+            'method' => 'textbox',
+            'friendly_name' => __('Command'),
+            'description' => __('Command to check the device, 1st show content of flash, 2nd get current version'),
+            'value' => '|arg1:command|',
+            'max_length' => '255',
+            'size' => 255
+        ),
+        'regex' => array(
+            'method' => 'textbox',
+            'friendly_name' => __('RegEx'),
+            'description' => __('Regex to extract the version on second match'),
+            'value' => '|arg1:regex|',
+            'max_length' => '255',
+            'size' => 255
+        ),
         'id' => array(
             'method' => 'hidden_zero',
             'value' => '|arg1:id|'
+        ),
+        'model' => array(
+            'method' => 'hidden',
+            'value' => '|arg1:model|'
         )
     );
-
-    /* ================= input validation ================= */
-	get_filter_request_var('id');
-    /* ==================================================== */
-    
-    $id = (isset_request_var('id') ? get_request_var('id') : '0');
-    if($id)
-    {
-        $image = db_fetch_row_prepared("SELECT * FROM plugin_ciscotools_image WHERE id= ?", array($id));
-        $header_label = __esc('Ciscotools Model&Image [edit: %s - %s]', $image['model'], $image['image']);
-    }
-    else
-    {
-        $header_label = __('Ciscotools Model [new]');
-    }
-
+  
     form_start('display_image.php');
     html_start_box($header_label, '100%', true, '3', 'center', '');
 
@@ -427,30 +482,34 @@ function edit_image($image=null)
 	);
 
     html_end_box(true, true);
-    form_save_button('display_image.php?action=display_image&header=false', 'return');
+    form_save_button('display_image.php');
 }
 
 function image_form_save()
 {
-	$save['id']		= get_request_var('id');
-	$save['model']	= form_input_validate(trim(get_nfilter_request_var('model')), 'model', '', false, 3);
-	$save['image']	= form_input_validate(trim(get_nfilter_request_var('image')), 'image', '', false, 3);
-    $save['mode']   = form_input_validate(trim(get_nfilter_request_var('mode')), 'mode', '', false, 3);
-    
+	$save['id']			= get_request_var('id');
+	$save['model_id']	= form_input_validate(trim(get_nfilter_request_var('model_id')), 'model_id', '', false, 3);
+	$save['image']		= form_input_validate(trim(get_nfilter_request_var('image')), 'image', '', false, 3);
+    $save['mode']   	= form_input_validate(trim(get_nfilter_request_var('mode')), 'mode', '', false, 3);
+	$save['command']	= form_input_validate(trim(get_nfilter_request_var('command')), 'command', '', false, 3);
+	$save['regex']		= form_input_validate(trim(get_nfilter_request_var('regex')), 'regex', '', false, 3);
+
     $ciscotoolsImageId = 0;
     if(!is_error_message())
     {
         $ciscotoolsImageId = sql_save($save, 'plugin_ciscotools_image');
 
-        $sqlQuery = "UPDATE plugin_ciscotools_upgrade AS upgrade
-        JOIN host
-        ON upgrade.host_id = host.id
-        SET upgrade.status = 22
-        WHERE host.type = '" . $save['model'] . "'";
+        $sqlQuery = "UPDATE plugin_ciscotools_upgrade
+        LEFT JOIN host ON plugin_ciscotools_upgrade.host_id = host.id
+		LEFT JOIN plugin_extenddb_model ON plugin_extenddb_model.model = host.type
+        SET plugin_ciscotools_upgrade.status = ".UPGRADE_STATUS_NEED_RECHECK."
+        WHERE plugin_extenddb_model.id= '" . $save['model_id'] . "'";
         $sqlExec = db_execute($sqlQuery);
 
         raise_message(($ciscotoolsImageId) ? 1 : 2);
-    }
-    header('Location: display_image.php?action=display_image&header=false');
+   } 
+	unset_request_var("model");
+	kill_session_var("sess_ciscotools_model");
+	header('Location: display_image.php?action=display_image&header=false');
 }
 ?>

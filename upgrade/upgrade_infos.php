@@ -30,6 +30,7 @@
  */
 function ciscotools_upgrade_get_infos($deviceID)
 {
+	// get all infromation from the DB
     $device = ciscotools_upgrade_get_device($deviceID);
     if($device === false)
     {   // Error getting device infos
@@ -37,16 +38,17 @@ function ciscotools_upgrade_get_infos($deviceID)
         return false;
     }
 
+	// just format SNMP information from $device to another format!
     $snmp = ciscotools_upgrade_get_snmp($device);
-    if($snmp === false) 
-    {   // Error getting SNMP infos
+    if($snmp === false) {
+		// Error getting SNMP infos
         ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_SNMP_ERROR);
         return false;
     }
     
     $model = ciscotools_upgrade_get_version($device);
-    if($model === false)
-    {   // Error getting image infos
+    if($model === false) {
+		// Error getting image infos
         ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_IMAGE_INFO_ERROR);
         return false;
     }
@@ -68,20 +70,13 @@ function ciscotools_upgrade_get_infos($deviceID)
  * @param    integer     $deviceID:  the ID of the device (host.id)
  * @return   array|bool  $infosDevice if successful, false otherwise
  */
-function ciscotools_upgrade_get_device($deviceID)
-{
-    $sqlQuery ="SELECT host.id, host.description, host.hostname,
-              host.snmp_community, host.snmp_version,
-              host.snmp_username, host.snmp_password, host.snmp_auth_protocol, host.snmp_priv_passphrase, host.snmp_priv_protocol, host.snmp_port, host.snmp_timeout,
-              host.snmp_sysObjectID,
-              host.can_be_upgraded, host.can_be_rebooted, host.type
-              FROM host
-              WHERE host.id=$deviceID";
+function ciscotools_upgrade_get_device($deviceID) {
+    $sqlQuery ="SELECT * FROM host WHERE host.id=$deviceID";
     $infosDevice = db_fetch_row_prepared($sqlQuery);
 
-    if($infosDevice === false) 
-    {   // Model unsupported
-        ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_UNSUPORTED);
+    if($infosDevice === false) {
+	// ID not find on host DB
+        ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_INFO_ERROR);
         return false;
     }
     return $infosDevice;
@@ -99,27 +94,27 @@ function ciscotools_upgrade_get_device($deviceID)
 * @param string $deviceHostname the name of the device useful for the logs
 * @return array|bool $snmpInfos if successful, false otherwise
 */
-function ciscotools_upgrade_get_snmp($infosDevice)
-{
-    if($infosDevice['snmp_version'] == 2)
-    {   // Formatting version 2 to 2c
+function ciscotools_upgrade_get_snmp($infosDevice) {
+    if($infosDevice['snmp_version'] == 2) {
+	// Formatting version 2 to 2c
         $infosDevice['snmp_version'] = "2c";
     }
-    else if($infosDevice['snmp_version'] == 3)
-    {
+    else if($infosDevice['snmp_version'] == 3) {
         $infosDevice['snmp_version'] = "3";
     }
+	
     $snmpInfos = 
     [
-        'community'         => $infosDevice['snmp_community'],          // Get community string
-        'version'           => $infosDevice['snmp_version'],            // Get SNMP's version
-        'username'          => $infosDevice['snmp_username'],           // Get SNMP's username for v3
-        'password'          => $infosDevice['snmp_password'],           // Get SNMP's password for v3
-        'authProtocol'      => $infosDevice['snmp_auth_protocol'],      // GET SNMP's auth protocol for v3
-        'privPassphrase'    => $infosDevice['snmp_priv_passphrase'],    // GET SNMP's private passphrase for v3
-        'privProtocol'      => $infosDevice['snmp_priv_protocol'],      // GET SNMP's private protocol for v3
-        'port'              => $infosDevice['snmp_port'],               // GET SNMP's port
-        'timeout'           => $infosDevice['snmp_timeout']             // GET SNMP's timeout
+        'snmp_community'         => $infosDevice['snmp_community'],          // Get community string
+        'snmp_version'           => $infosDevice['snmp_version'],            // Get SNMP's version
+        'snmp_username'          => $infosDevice['snmp_username'],           // Get SNMP's username for v3
+        'snmp_password'          => $infosDevice['snmp_password'],           // Get SNMP's password for v3
+        'snmp_auth_protocol'     => $infosDevice['snmp_auth_protocol'],      // GET SNMP's auth protocol for v3
+        'snmp_priv_passphrase'   => $infosDevice['snmp_priv_passphrase'],    // GET SNMP's private passphrase for v3
+        'snmp_priv_protocol'     => $infosDevice['snmp_priv_protocol'],      // GET SNMP's private protocol for v3
+        'snmp_context'      	 => $infosDevice['snmp_context'],      		 // GET SNMP's context for v3
+        'snmp_port'              => $infosDevice['snmp_port'],               // GET SNMP's port
+        'snmp_timeout'           => $infosDevice['snmp_timeout']             // GET SNMP's timeout
     ];
 
     $snmpInfos['session'] = "." . $infosDevice['id'];
@@ -129,7 +124,7 @@ function ciscotools_upgrade_get_snmp($infosDevice)
 /* ==================================================== */
 
 /** ================= VERSION INFOS =================
-* Get all informations about the model and the version (image)
+* Get all informations about the model and the desired version (image)
 *
 * Get the name of the image, the SSH commands to check if the version is installed
 * and the upgrade method depending of the OS (IOS and IOS-XE)
@@ -139,45 +134,24 @@ function ciscotools_upgrade_get_snmp($infosDevice)
 */
 function ciscotools_upgrade_get_version($infosDevice)
 { 
-    $sshCmds_mode = array(
-        'bundle'    => "dir|show boot",
-        'install'   => "dir|more flash:.installer/install_add_oper.log"
-    );
-    $sqlSelect = "SELECT plugin_ciscotools_image.id, " 
-                ."plugin_ciscotools_image.model, plugin_ciscotools_image.image, plugin_ciscotools_image.mode, "
-                ."plugin_extenddb_model.oid_model, plugin_extenddb_model.snmp_SysObjectId "
-                ."FROM plugin_ciscotools_image "
-                ."LEFT JOIN plugin_extenddb_model ON plugin_extenddb_model.model = plugin_ciscotools_image.model "
-                ."WHERE plugin_ciscotools_image.model ='" . $infosDevice['type'] . "' "
-                ."GROUP BY plugin_ciscotools_image.image";
-    $upgradeInfos = db_fetch_assoc($sqlSelect); // Get infos for upgrade
+	$sqlSelect ="SELECT plugin_ciscotools_image.image as image, 
+				plugin_ciscotools_image.mode as mode,
+				plugin_ciscotools_image.command as command
+				FROM plugin_ciscotools_image
+				LEFT JOIN plugin_extenddb_model ON plugin_extenddb_model.model ='".$infosDevice['type'] ."'
+				LEFT JOIN plugin_ciscotools_upgrade ON plugin_extenddb_model.id = plugin_ciscotools_image.model_id
+				LEFT JOIN host ON host.id = plugin_ciscotools_upgrade.host_id
+				WHERE host_id = ".$infosDevice['id'];
+    $upgradeInfos = db_fetch_row($sqlSelect); // Get infos for upgrade
 
     if($upgradeInfos === false)
     {
-        ciscotools_log("[ERROR] Upgrade: No info for upgrade!");
+        ciscotools_log("[ERROR] Upgrade: No info for upgrade ".$infosDevice['description']."!");
         return false;
     }
 
-    // Regex to check model & verify if version already installed
-    $modelRegex = '/STRING: "(.*)"$/';
-    foreach($upgradeInfos as $row)
-    {
-//		    function ciscotools_upgrade_snmp_walk($snmpVersion, $snmpCommunity, $deviceIP, $oid, $snmpInfos) 
-        $snmpModel = ciscotools_upgrade_snmp_walk("2c", "telvlsn", $row['snmp_SysObjectId'], $row['oid_model'], $infosDevice);
-        preg_match_all($modelRegex, $snmpModel, $model);
-        if($model)
-        {
-            $modelInfos = ['image' => $row['image'], "sshCmds_mode" => $sshCmds_mode[$row['mode']], "mode" => $row['mode']];
-            return $modelInfos;
-        }
-        else
-        {
-            ciscotools_log("[ERROR] Upgrade: No model found!");
-            return false;
-        }
-    }
+	$modelInfos = ['image' => $upgradeInfos['image'], "mode" => $upgradeInfos['mode'], "command" => $upgradeInfos['command']];
+    return $modelInfos;
 }
-/* ==================================================== */
 
-/* ============================================================================================== */
 ?>

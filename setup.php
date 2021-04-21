@@ -24,11 +24,11 @@
 
 include_once($config['base_path'] . '/plugins/ciscotools/upgrade/upgrade_const.php');
 include_once($config['base_path'] . '/plugins/ciscotools/upgrade/display_upgrade.php');
+include_once($config['base_path'] . '/plugins/ciscotools/upgrade/upgrade.php');
+include_once($config['base_path'] . '/plugins/ciscotools/upgrade/upgrade_table.php');
 include_once($config['base_path'] . '/plugins/ciscotools/display_backup.php');
 include_once($config['base_path'] . '/plugins/ciscotools/display_mac.php');
 include_once($config['base_path'] . '/plugins/ciscotools/backup.php');
-include_once($config['base_path'] . '/plugins/ciscotools/upgrade/upgrade.php');
-include_once($config['base_path'] . '/plugins/ciscotools/upgrade/upgrade_table.php');
 include_once($config['base_path'] . '/plugins/ciscotools/mactrack.php');
 
 function plugin_ciscotools_install () {
@@ -36,6 +36,7 @@ function plugin_ciscotools_install () {
 	api_plugin_register_hook('ciscotools', 'config_settings', 'ciscotools_config_settings', 'setup.php');
 	api_plugin_register_hook('ciscotools', 'config_form', 'ciscotools_config_form', 'setup.php'); // host form
 	api_plugin_register_hook('ciscotools', 'api_device_new', 'ciscotools_api_device_new', 'setup.php'); // device already exist, just save value from the form
+	api_plugin_register_hook('ciscotools', 'device_remove', 'ciscotools_device_remove', 'setup.php'); // Remove device, so clean the upgrade table
 	api_plugin_register_hook('ciscotools', 'poller_bottom', 'ciscotools_poller_bottom', 'setup.php'); // check the backup on all valid device, and do backup if necessary and rentetioin validation
 
 // Device action
@@ -135,9 +136,24 @@ function ciscotools_check_upgrade() {
 			api_plugin_register_realm('ciscotools', 'display_image.php', 'Plugin -> CiscoTools: Images', 1);
 		}
 
-	}
+		if( $old < '1.2.7' ) {
+			// empty table of upgrade status, strut change to mutch to keep it
+			db_execute( "TRUNCATE TABLE plugin_ciscotools_upgrade");
+			// empty table of image, strut change to mutch to keep it
+			db_execute( "TRUNCATE TABLE plugin_ciscotools_image");
+			// remove row of model, taken from extenddb
+			db_execute( "ALTER TABLE plugin_ciscotools_image DROP COLUMN IF EXISTS model;");
+			// add the model_id that match the id of the model on the extenddb table
+			api_plugin_db_add_column ('ciscotools', 'plugin_ciscotools_image', array('name' => 'model_id', 'type' => 'mediumint(8)', 'NULL' => false,  'default' => 0));
+			// add command to check the current version running on the device
+			api_plugin_db_add_column ('ciscotools', 'plugin_ciscotools_image', array('name' => 'command', 'type' => 'varchar(255)', 'NULL' => false,  'default' => ''));
+			// add the regex to extract the exact version from the current running command
+			api_plugin_db_add_column ('ciscotools', 'plugin_ciscotools_image', array('name' => 'regex', 'type' => 'varchar(255)', 'NULL' => false,  'default' => ''));
 
-	fill_image_db(); // fill the image DB with inormation
+			// add new row on upgrade table, to keep the name of the actual image
+			api_plugin_db_add_column ('ciscotools', 'plugin_ciscotools_upgrade', array('name' => 'image', 'type' => 'varchar(255)', 'NULL' => true,  'default' => ''));			
+		}
+	}
 	
 	// if mac running is on change for a number to know how many process are running
 	if( read_config_option('ciscotools_mac_running') == 'off' ) set_config_option('ciscotools_mac_running', '0');
@@ -155,7 +171,7 @@ function ciscotools_setup_tables() {
 	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'can_be_rebooted', 'type' => 'varchar(3)', 'NULL' => true, 'default' => ''));
 	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'do_backup', 'type' => 'varchar(3)', 'NULL' => true, 'default' => ''));
 
-/* table to keep diff information */
+/* table to keep diff information for backup*/
 	$data = array();
 	$data['columns'][] = array('name' => 'id', 'type' => 'mediumint(8)', 'auto_increment'=>'');
 	$data['columns'][] = array('name' => 'host_id', 'type' => 'mediumint(8)', 'NULL' => false, 'default' => '0');
@@ -201,13 +217,11 @@ function ciscotools_setup_tables() {
 
 	// add mac info into the host table
 	api_plugin_db_add_column ('ciscotools', 'host', array('name' => 'keep_mac_track', 'type' => 'varchar(2)', 'NULL' => true, 'default' => ''));
-
 	
 /* table to keep OID information */
 /*
 {"oui":"98:74:DA","isPrivate":false,"companyName":"Infinix mobility Ltd","companyAddress":"RMS 05-15, 13A/F SOUTH TOWER WORLD FINANCE CTR HARBOUR CITY 17 CANTON RD TST KLN HONG KONG HongKong HongKong 999077 HK","countryCode":"HK","assignmentBlockSize":"MA-L","dateCreated":"2017-02-21","dateUpdated":"2017-02-21"}
 */
-
 	$data = array();
 	$data['columns'][] = array('name' => 'id', 'type' => 'mediumint(8)', 'auto_increment'=>'');
 	$data['columns'][] = array('name' => 'oui', 'type' => 'varchar(8)', 'NULL' => false, 'unique_keys' =>'' );
@@ -226,23 +240,25 @@ function ciscotools_setup_tables() {
 	$data['columns'][] = array('name' => 'id', 'type' => 'mediumint(8)', 'auto_increment' => '');
 	$data['columns'][] = array('name' => 'host_id', 'type' => 'mediumint(8)', 'NULL' => false, 'default' => '0');
 	$data['columns'][] = array('name' => 'status', 'type' => 'tinyint(1)', 'NULL' => false, 'default' => '0');
+	$data['columns'][] = array('name' => 'image', 'type' => 'varchar(255)', 'NULL' => false, 'default' => '');
 	$data['primary'] = 'id';
 	$data['keys'][] = array('name' => 'id', 'columns' => 'id');
 	$data['keys'][] = array('name' => 'host_id', 'columns' => 'host_id');
 	$data['type'] = 'InnoDB';
 	api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_upgrade', $data);
 
-/* table to keep diff info for image */
-	unset($data);
-	$data = array();
-	$data['columns'][] = array('name' => 'id', 'type' => 'mediumint(8)', 'auto_increment' => '');
-	$data['columns'][] = array('name' => 'model', 'type' => 'varchar(64)', 'NULL' => false);
-	$data['columns'][] = array('name' => 'image', 'type' => 'varchar(255)', 'NULL' => false);
-	$data['columns'][] = array('name' => 'mode', 'type' => 'varchar(7)', 'NULL' => false, 'default' => 'bundle');
-	$data['primary'] = 'id';
-	$data['keys'][] = array('name' => 'model', 'columns' => 'model');
-	$data['type'] = 'InnoDB';
-	api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_image', $data);
+	/* table to keep info for image */
+    unset($data);
+    $data = array();
+    $data['columns'][] = array('name' => 'id', 'type' => 'mediumint(8)', 'auto_increment' => '');
+    $data['columns'][] = array('name' => 'model_id', 'type' => 'mediumint(8)', 'NULL' => false);
+    $data['columns'][] = array('name' => 'image', 'type' => 'varchar(255)', 'NULL' => false);
+    $data['columns'][] = array('name' => 'mode', 'type' => 'varchar(7)', 'NULL' => false, 'default' => 'bundle');
+    $data['columns'][] = array('name' => 'command', 'type' => 'varchar(255)', 'NULL' => false, 'default' => '');
+    $data['columns'][] = array('name' => 'regex', 'type' => 'varchar(255)', 'NULL' => false, 'default' => '');
+    $data['primary'] = 'id';
+    $data['type'] = 'InnoDB';
+    api_plugin_db_table_create('ciscotools', 'plugin_ciscotools_image', $data);
 
 }
 
@@ -259,13 +275,24 @@ function ciscotools_check_dependencies() {
 }
 
 function ciscotools_config_arrays () {
-	global $ciscotools_console_type,$ciscotools_backup_frequencies, $ciscotools_retention_duration, $mactrack_poller_frequencies,
+	global $ciscotools_console_type,$ciscotools_backup_frequencies, $ciscotools_retention_duration, $mactrack_poller_frequencies, $ciscotools_upgrade_frequencies,
 	$mactrack_data_retention, $statusText, $statusColor;
 
 	$ciscotools_console_type = array(
 		"0" => "Disabled",
 		"1" => "SSH",
 		"2" => "Telnet"
+		);
+
+	$ciscotools_upgrade_frequencies = array(
+		"0" => "Disabled",
+		"600" => "Every 10 minutes",
+		"1800" => "Every half hours",
+		"3600" => "Every hours",
+		"86400" => "Every Day",
+		"604800" => "Every Week",
+		"1209600" => "Every 2 Weeks",
+		"2419200" => "Every 4 Weeks"
 		);
 
 	$ciscotools_backup_frequencies = array(
@@ -315,7 +342,7 @@ function ciscotools_config_arrays () {
 }
 
 function ciscotools_config_form () {
-	global $config, $fields_host_edit, $ciscotools_console_type, $ciscotools_backup_frequencies;
+	global $config, $fields_host_edit, $ciscotools_console_type, $ciscotools_backup_frequencies, $ciscotools_upgrade_frequencies;
 	
 	$fields_host_edit2 = $fields_host_edit;
 	$fields_host_edit3 = array();
@@ -385,7 +412,7 @@ function ciscotools_config_form () {
 }
 
 function ciscotools_config_settings () {
-	global $config, $tabs, $settings, $ciscotools_console_type, $ciscotools_backup_frequencies, 
+	global $config, $tabs, $settings, $ciscotools_console_type, $ciscotools_backup_frequencies,  $ciscotools_upgrade_frequencies, 
 	$ciscotools_retention_duration, $mactrack_poller_frequencies, $mactrack_data_retention;
 
 	if (isset($_SERVER['PHP_SELF']) && basename($_SERVER['PHP_SELF']) != 'settings.php')
@@ -441,6 +468,13 @@ function ciscotools_config_settings () {
 			'description' => "We use SNMP command to upload the upgrade by default, enable to use console and tftp instead.",
 			'method' => 'checkbox',
 			'default' => 'off'
+			),
+		'ciscotools_upgrade_check_periode' => array(
+			'friendly_name' => "Upgrade check periode",
+			'description' => "WHow often do we check for the upgrade process.",
+			'method' => "drop_array",
+			'default' => '0',
+			'array' => $ciscotools_upgrade_frequencies,
 			),
 		'ciscotools_default_tftp' => array(
 			'friendly_name' => 'TFTP server address',
@@ -509,6 +543,15 @@ function ciscotools_config_settings () {
 	);
 }
 
+function ciscotools_device_remove($host_id) {
+	global $config;
+    ciscotools_log('Start ciscotools remove: '.print_r($host_id, true) );
+	$sqlQuery = "DELETE FROM plugin_ciscotools_upgrade WHERE plugin_ciscotools_upgrade.host_id =$host_id";
+	$sqlExec = db_execute($sqlQuery);
+
+	return $host_id;
+}
+
 function ciscotools_api_device_new($hostrecord_array) {
 	global $config;
 
@@ -522,7 +565,7 @@ function ciscotools_api_device_new($hostrecord_array) {
 		return $hostrecord_array;
 	}
 
-	ciscotools_log('Enter Ciscotools: '.$hostrecord_array['description'].'('.$hostrecord_array['id'].')');
+ciscotools_log('Enter Ciscotools: '.$hostrecord_array['description'].'('.$hostrecord_array['id'].')');
 
 // We need to check if it's a cisco device
 	$hostrecord_array['snmp_sysDescr'] = db_fetch_cell_prepared("SELECT snmp_sysDescr
@@ -532,7 +575,7 @@ function ciscotools_api_device_new($hostrecord_array) {
 
 	// don't do it for not Cisco type	
 	if( mb_stripos($hostrecord_array['snmp_sysDescr'], "cisco") === false) {
-		ciscotools_log('Device Type:'.$hostrecord_array['snmp_sysDescr']);
+ciscotools_log('Device Type:'.$hostrecord_array['snmp_sysDescr']);
 		return $hostrecord_array;
 	}
 
@@ -580,8 +623,10 @@ function ciscotools_api_device_new($hostrecord_array) {
 	}
 
 	sql_save($hostrecord_array, 'host');
-
-	ciscotools_log('End Ciscotools' );
+// check the device to see it's status
+	ciscotools_upgrade_device_check($hostrecord_array['id']);
+	
+ciscotools_log('End Ciscotools' );
 	
 	return $hostrecord_array;
 }
@@ -590,6 +635,7 @@ function ciscotools_device_action_array($device_action_array) {
 	$device_action_array['ciscotools_upgrade'] = __('Force upgrade');
 	$device_action_array['ciscotools_backup'] = __('Force Backup');
 	$device_action_array['ciscotools_mactrack'] = __('Force Mac Pooling');
+	$device_action_array['ciscotools_check_upg'] = __('Check upgrade');
 
 	return $device_action_array;
 }
@@ -597,20 +643,22 @@ function ciscotools_device_action_array($device_action_array) {
 function ciscotools_device_action_execute($action) {
 	global $config;
 
-	if ($action != 'ciscotools_upgrade' && $action != 'ciscotools_backup' && $action != 'ciscotools_mactrack') {
+	if ($action != 'ciscotools_upgrade' && $action != 'ciscotools_backup' && $action != 'ciscotools_mactrack' && $action != 'ciscotools_check_upg') {
 		return $action;
 	}
 
 	$selected_items = sanitize_unserialize_selected_items(get_nfilter_request_var('selected_items'));
 
 	if ($selected_items != false) {
-		for ($i = 0; ($i < count($selected_items)); $i++) {
+		foreach($selected_items as $device ) {
 			if ($action == 'ciscotools_upgrade') {
-				ciscotools_upgrade_table($selected_items[$i], 'force');
+				ciscotools_upgrade_table($device, 'force');
 			} else if($action == 'ciscotools_backup') {
-				ciscotools_backup($selected_items[$i]);
+				ciscotools_backup($device);
+			} else if($action == 'ciscotools_check_upg') {
+				ciscotools_upgrade_device_check($device);
 			} else if($action == 'ciscotools_mactrack') {
-				$hostrecord_array = db_fetch_row( 'SELECT *  FROM host where id='.$selected_items[$i] );
+				$hostrecord_array = db_fetch_row( 'SELECT * FROM host where id='.$device );
 				get_mac_table($hostrecord_array);
 			}
 		}
@@ -627,6 +675,8 @@ function ciscotools_device_action_prepare($save) {
 			$action_description = 'Upgrade selected devices';
 		} else if ($action == 'ciscotools_backup') {
 			$action_description = "Backup selected devices.";
+		} else if ($action == 'ciscotools_check_upg') {
+			$action_description = "Check upgrade on selected devices.";
 		} else if ($action == 'ciscotools_mactrack') {
 			$action_description = "Pool mac address on selected devices.";
 		} else return $save;
@@ -648,9 +698,9 @@ function ciscotools_poller_bottom () {
 	include_once($config["library_path"] . "/database.php");
 
 	//*************** Upgrade Poller
-	$pollerIntervalUpgrade = "300"; // 60: 1 minute | 300: 5 minutes
+	$pollerIntervalUpgrade =  read_config_option('ciscotools_upgrade_check_periode');
 	$lastPoller = read_config_option('ciscotools_upgrade_lastPoll'); // See when was the last poll for an upgrade
-	
+
 	if((time() - $lastPoller) <= $pollerIntervalUpgrade) {
 		ciscotools_log("Upgrade: time: " . time() . " | lp: " . $lastPoller . " | poller: " . $pollerIntervalUpgrade 
 		. " | diff: " . (time() - $lastPoller));
@@ -674,36 +724,34 @@ function ciscotools_poller_bottom () {
 	//************* Backup Poller
 	$poller_interval = read_config_option('ciscotools_check_backup');
 
-	if ($poller_interval == "0") {
-		return;
-	}
-
-	$lp = read_config_option('ciscotools_last_poll');
-
-	if ((time() - $lp) <= $poller_interval ){
-		ciscotools_log('Backup time: '.time().' lp: '. $lp .' poller: '. $poller_interval.' diff: '.(time() - $lp));
-	} else {
-
-		set_config_option('ciscotools_last_poll', time());
+	if ($poller_interval != "0") {
+		$lp = read_config_option('ciscotools_last_poll');
 	
-		ciscotools_log('Backup Go time: '.time().' lp: '. $lp .' poller: '. $poller_interval.' diff: '.(time() - $lp));
-
-		// this function take too long to call it directly, we have to call it in background
-		// a check has to be made to be sure not to run it twice
-		$command_string = trim(read_config_option('path_php_binary'));
-		
-		// If its not set, just assume its in the path
-		if (trim($command_string) == '')
-			$command_string = 'php';
-			$extra_args = ' -q ' . $config['base_path'] . '/plugins/ciscotools/check_backup.php';
-		if( read_config_option('ciscotools_backup_running') != 'on' ) {
-			cacti_log('Start Backup', false, 'CISCOTOOLS');
-			set_config_option('ciscotools_backup_running', 'on');
-			exec_background($command_string, $extra_args);
-// purge poller, test is made only when we should do a backup, to avoid overload of the pooler bottom
-			purge_backup();
+		if ((time() - $lp) <= $poller_interval ){
+			ciscotools_log('Backup time: '.time().' lp: '. $lp .' poller: '. $poller_interval.' diff: '.(time() - $lp));
 		} else {
-			cacti_log('Backup is running: ', false, 'CISCOTOOLS');
+	
+			set_config_option('ciscotools_last_poll', time());
+		
+			ciscotools_log('Backup Go time: '.time().' lp: '. $lp .' poller: '. $poller_interval.' diff: '.(time() - $lp));
+	
+			// this function take too long to call it directly, we have to call it in background
+			// a check has to be made to be sure not to run it twice
+			$command_string = trim(read_config_option('path_php_binary'));
+			
+			// If its not set, just assume its in the path
+			if (trim($command_string) == '')
+				$command_string = 'php';
+				$extra_args = ' -q ' . $config['base_path'] . '/plugins/ciscotools/check_backup.php';
+			if( read_config_option('ciscotools_backup_running') != 'on' ) {
+				cacti_log('Start Backup', false, 'CISCOTOOLS');
+				set_config_option('ciscotools_backup_running', 'on');
+				exec_background($command_string, $extra_args);
+	// purge poller, test is made only when we should do a backup, to avoid overload of the pooler bottom
+				purge_backup();
+			} else {
+				cacti_log('Backup is running: ', false, 'CISCOTOOLS');
+			}
 		}
 	}
 	
@@ -813,7 +861,18 @@ function ciscotools_utilities_list () {
 			Change, add or remove an image entry on the Ciscotools Image table.
 		</td>
 	<?php
-	
+	form_end_row();
+		form_alternate_row();
+	?>
+		<td class="textArea">
+			<a href='utilities.php?action=ciscotools_check_upg'>Ciscotools check upgrade</a>
+		</td>
+		<td class="textArea">
+			Check the devices to know if they have to be upgraded.
+		</td>
+	<?php
+	form_end_row();
+
 }
 
 function ciscotools_utilities_action ($action) {
@@ -857,6 +916,12 @@ function ciscotools_utilities_action ($action) {
 		include_once('./include/top_header.php');
 		utilities();
 		include_once('./include/bottom_footer.php');
+	} else if ($action == 'ciscotools_check_upg') {
+		cacti_log( 'Check devices for upgrade', false, 'CISCOTOOLS' );
+		ciscotools_upgrade_device_check();
+		include_once('./include/top_header.php');
+		utilities();
+		include_once('./include/bottom_footer.php');
 	}
 	return $action;
 }
@@ -866,37 +931,5 @@ function ciscotools_log( $text ){
     if( $dolog ){
 		cacti_log( $text, false, 'CISCOTOOLS' );
 	}
-}
-
-function fill_image_db(){
-	/* insert values in plugin_ciscotools_image */
-	db_execute("INSERT INTO plugin_ciscotools_image 
-		(`model`, `image`, `mode`) VALUES 
-		('IR807-LTE-GA-K9', 'ir800l-universalk9-mz.SPA.159-3.M.bin', 'bundle'),
-		('C819HG-U-K9', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'bundle'),
-		('C819G-4G-GA-K9', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'bundle'),
-		('C819G-U-K9', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'bundle'),
-		('C819G-4G-G-K9', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'bundle'),
-		('CISCO881', 'c880data-universalk9-mz.155-3.M6.bin', 'bundle'),
-		('CISCO891-K9', 'c890-universalk9-mz.155-3.M8.bin', 'bundle'),
-		('cisco891F', 'c800-universalk9-mz.SPA.155-3.M8.bin', 'bundle'),
-		('IR1101-K9', 'ir1101-universalk9.16.12.03.SPA.bin', 'bundle'),
-		('CISCO3945-CHASSIS', 'c3900-universalk9-mz.SPA.155-3.M4.bin', 'bundle'),
-		('IE-2000-4T-G-B', 'ie2000-universalk9-tar.152-4.EA7.tar', 'bundle'),
-		('IE-2000-4TC-G-B', 'ie2000-universalk9-tar.152-4.EA7.tar', 'bundle'),
-		('IE-2000-8TC-G-B', 'ie2000-universalk9-tar.152-4.EA7.tar', 'bundle'),
-		('IE-2000-16PTC-G-E', 'ie2000-universalk9-tar.152-4.EA7.tar', 'bundle'),
-		('IE-3000-8TC', 'ies-lanbasek9-tar.152-4.EA8.tar', 'bundle'),
-		('WS-C2960X-24PS-L', 'c2960x-universalk9-mz.152-6.E2.bin', 'bundle'),
-		('WS-C2960S-24PS-L', 'c2960s-universalk9-mz.152-2.E9.bin', 'bundle'),
-		('WS-C3560CG-8PC-S', 'c3560c405ex-universalk9-mz.152-2.E6.bin', 'bundle'),
-		('WS-C3560CX-12PC-S', 'c3560cx-universalk9-mz.152-7.E2.bin', 'bundle'),
-		('WS-C3560CX-12PD-S', 'c3560cx-universalk9-mz.152-7.E2.bin', 'bundle'),
-		('WS-C3850-24XS-S', 'cat3k_caa-universalk9.16.06.06.SPA.bin', 'bundle'),
-		('WS-C-4500X-32', 'cat4500e-universalk9.SPA.03.06.05.E.152-2.E5.bin', 'bundle'),
-		('C9200L-24P-4G-E', 'cat9k_lite_iosxe.16.09.05.SPA.bin', 'install'),
-        ('C9500-16X', 'cat9k_iosxe.16.09.05.SPA.bin', 'install')"
-    );
-
 }
 ?>
