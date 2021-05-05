@@ -79,6 +79,11 @@ function ciscotools_upgrade_get_device($deviceID) {
         ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_INFO_ERROR);
         return false;
     }
+	$defaultupgrade = read_config_option('can_be_upgraded');
+	if($infosDevice['can_be_upgraded'] != 'off' ){
+		if( $defaultupgrade == 'on' )
+			$infosDevice['can_be_upgraded'] = 'on';
+	}
     return $infosDevice;
 }
 /* ==================================================== */
@@ -138,7 +143,7 @@ function ciscotools_upgrade_get_version($infosDevice)
 				plugin_ciscotools_image.mode as mode,
 				plugin_ciscotools_image.command as command
 				FROM plugin_ciscotools_image
-				LEFT JOIN plugin_extenddb_model ON plugin_extenddb_model.model ='".$infosDevice['type'] ."'
+				LEFT JOIN plugin_extenddb_model ON plugin_extenddb_model.model ='".$infosDevice['model'] ."'
 				LEFT JOIN plugin_ciscotools_upgrade ON plugin_extenddb_model.id = plugin_ciscotools_image.model_id
 				LEFT JOIN host ON host.id = plugin_ciscotools_upgrade.host_id
 				WHERE host_id = ".$infosDevice['id'];

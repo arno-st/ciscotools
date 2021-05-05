@@ -223,7 +223,7 @@ function display_image() {
         FROM plugin_ciscotools_image
 		INNER JOIN plugin_extenddb_model on plugin_ciscotools_image.model_id=plugin_extenddb_model.id
         $sqlWhere
-        ORDER BY plugin_ciscotools_image.id
+        ORDER BY plugin_extenddb_model.model
         LIMIT " . $sqlLimit;
     $result = db_fetch_assoc($sqlQuery);
 
@@ -276,6 +276,13 @@ function image_form_actions() {
             {
                 if(get_nfilter_request_var('drp_action') == '1') // delete
                 {
+					$sql_del = 'DELETE plugin_ciscotools_upgrade FROM plugin_ciscotools_upgrade 
+								LEFT JOIN host ON plugin_ciscotools_upgrade.host_id=host.id
+								LEFT JOIN plugin_extenddb_model ON plugin_extenddb_model.model=host.model 
+								LEFT JOIN plugin_ciscotools_image ON plugin_extenddb_model.id=plugin_ciscotools_image.model_id
+								WHERE plugin_ciscotools_image.id IN (' . implode(',', $selected_items) .')';
+					db_execute($sql_del);
+
                     db_execute('DELETE FROM plugin_ciscotools_image WHERE id IN (' . implode(',', $selected_items) . ')');
                     header('Location: display_image.php?header=false');
                 }
@@ -283,7 +290,7 @@ function image_form_actions() {
                 {  
                     if(count($selected_items) > 1)
                     {
-                        display_custom_error_message('Only one model type can be duplicated at time');
+                        display_custom_error_message('Only one model can be duplicated at time');
                         header('Location: display_image.php?header=false');
                     }
                     else
@@ -438,9 +445,9 @@ function edit_image($image=null)
         ),
         'mode' => array(
             'method' => 'drop_array',
-            'array'  => array("bundle"=>"bundle", "install"=>"install"),
+            'array'  => array("bundle"=>"bundle", "install"=>"install", "archive"=>"archive"),
             'friendly_name' => __('Mode'),
-            'description' => __('Mode type (bundle or install)'),
+            'description' => __('Mode type (bundle, install or archive)'),
             'value' => '|arg1:mode|',
             'max_length' => '7',
             'size' => 7
@@ -501,7 +508,7 @@ function image_form_save()
 
         $sqlQuery = "UPDATE plugin_ciscotools_upgrade
         LEFT JOIN host ON plugin_ciscotools_upgrade.host_id = host.id
-		LEFT JOIN plugin_extenddb_model ON plugin_extenddb_model.model = host.type
+		LEFT JOIN plugin_extenddb_model ON plugin_extenddb_model.model = host.model
         SET plugin_ciscotools_upgrade.status = ".UPGRADE_STATUS_NEED_RECHECK."
         WHERE plugin_extenddb_model.id= '" . $save['model_id'] . "'";
         $sqlExec = db_execute($sqlQuery);

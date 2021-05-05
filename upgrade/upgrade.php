@@ -66,7 +66,8 @@ function ciscotools_upgrade_step_one($deviceID)
 	}
 
 	// check if device can be upgrade automaticaly or not.
-    if($infos['device']['can_be_upgraded'] != 'on')
+	// by default if device is not set to off, backup is dependig fo configuration setup
+    if($infos['device']['can_be_upgraded'] == 'off')
     {   // Upgrade disabled, if device is not allowing upgrade, just bypass it
         ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_UPGRADE_DISABLED);
         return false;
@@ -106,8 +107,8 @@ function ciscotools_upgrade_step_two($deviceID)
 
     // Check upload status
     $uploadStatus = ciscotools_upgrade_check_upload($infos);
-    if($uploadStatus === 'error')
-    {   // Stuck in upload
+    if($uploadStatus === 'error') {
+		// Stuck in upload
         ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_UPLOAD_STUCK);
 ciscotools_log("[ERROR] Upgrade: " . $infos['device']['description'] . " seems to be stuck in upload!");
         return false;
@@ -117,7 +118,7 @@ ciscotools_log("[ERROR] Upgrade: " . $infos['device']['description'] . " seems t
     
     // Erasing old images
     if($infos['model']['mode'] == 'bundle') {
-		// Bundle mode
+		// Bundle and archive mode
         ciscotools_upgrade_delete_images($infos); // Delete old images
         $stream = create_ssh($deviceID);
         if($stream === false)
@@ -159,7 +160,30 @@ ciscotools_log("device: ".$infos['device']['description']." Install status : ".p
 
         if($infos['device']['can_be_rebooted'] === 'on') ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_ACTIVATING);
         else ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_NEED_COMMIT);
-    }
+    } else if($infos['model']['mode'] == 'archive') {
+		// IE2000 or IE3000 serie
+        ciscotools_upgrade_delete_images($infos); // Delete old images
+        $stream = create_ssh($deviceID);
+        if($stream === false)
+        {
+            ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_SSH_ERROR);
+            return false;
+        }
+
+        if(ssh_write_stream($stream, "wr") === false) return false;
+        ssh_read_stream($stream);
+		// activate the new version
+        if(ssh_write_stream($stream, "archive extract flash:" . $infos['model']['image']) === false) return false;
+        $installStatus = ssh_read_stream($stream);
+ciscotools_log("device: ".$infos['device']['description']." Archive status : ".print_r($installStatus, true) );
+		if( stripos($installStatus, 'INSTALL-3-OPERATION_ERROR_MESSAGE' ) !== false ) {
+			ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_ACTIVATING_ERROR);
+			return false;
+		}
+
+        if($infos['device']['can_be_rebooted'] === 'on') ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_ACTIVATING);
+        else ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_NEED_COMMIT);
+	}
     return true;
 }
 
@@ -191,29 +215,7 @@ function ciscotools_upgrade_step_three($deviceID) {
     if( ($infos['device']['can_be_rebooted'] != 'on') ) {
 		ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_NEED_COMMIT); // Must be activated and comitted!
 	}
-/*	
-    // OIDs
-    $snmpCopyEntry      = "1.3.6.1.4.1.9.9.96.1.1.1.1";    // ccCopyEntry
-    $snmpCopyProtocol   = $snmpCopyEntry . ".2";            // ccCopyProtocol       
-    $snmpCopySrcFileType= $snmpCopyEntry . ".3";            // ccCopySourceFileType
-    $snmpCopyDstFileType= $snmpCopyEntry . ".4";            // ccCopyDestFileType
-    $snmpCopySrvAddress = $snmpCopyEntry . ".5";            // ccCopyServerAddress
-    $snmpCopyFileName   = $snmpCopyEntry . ".6";            // ccCopyFileName
-    $snmpCopyStatus     = $snmpCopyEntry . ".14";           // ccCopyEntryRowStatus
 
-    // Protocol TFTP
-    ciscotools_upgrade_snmp_set($infos['snmp']['version'], $infos['device']['hostname'], $snmpCopyProtocol . $infos['snmp']['session'], "i", "1", $infos['snmp']);
-    // Source file type - Network file
-    ciscotools_upgrade_snmp_set($infos['snmp']['version'], $infos['device']['hostname'], $snmpCopySrcFileType . $infos['snmp']['session'], "i", "1", $infos['snmp']);
-    // Destination file type - Running-config
-    ciscotools_upgrade_snmp_set($infos['snmp']['version'], $infos['device']['hostname'], $snmpCopyDstFileType . $infos['snmp']['session'], "i", "4", $infos['snmp']);
-    // Server Address - TFTP
-    ciscotools_upgrade_snmp_set($infos['snmp']['version'], $infos['device']['hostname'], $snmpCopySrvAddress . $infos['snmp']['session'], "a", $tftpAddress, $infos['snmp']);
-    // Filename - activate.txt
-    ciscotools_upgrade_snmp_set($infos['snmp']['version'], $infos['device']['hostname'], $snmpCopyFileName . $infos['snmp']['session'], "s", "activate.txt", $infos['snmp']);
-    // Status - 1 to begin
-    ciscotools_upgrade_snmp_set($infos['snmp']['version'], $infos['device']['hostname'], $snmpCopyStatus . $infos['snmp']['session'], "i", "1", $infos['snmp']);
-*/
     ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_REBOOTING);
     return true;
 }

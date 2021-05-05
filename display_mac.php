@@ -137,7 +137,6 @@ table plugin_ciscotools_mactrack
 			$sql_where
 			ORDER BY ".$sort_column." ".$sort_direction." 
 			LIMIT " . $sql_limit;
-
 	$result = db_fetch_assoc($sql_query); // query result is one entry par backup
 
 	?>

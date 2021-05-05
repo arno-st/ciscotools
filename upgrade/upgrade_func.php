@@ -41,7 +41,7 @@ ciscotools_log('Devices upgrade check' );
 		$sqlField = 'AND host.id = '. $device_id;
 	} else {
 		// check all device where an image exist
-		$sqlField = "AND host.type <> '' AND host.disabled !='on' AND host.status ='3'
+		$sqlField = "AND host.model <> '' AND host.disabled !='on' AND host.status ='3'
                 AND NOT EXISTS (
                     SELECT plugin_ciscotools_upgrade.host_id FROM plugin_ciscotools_upgrade 
                     WHERE host.id = plugin_ciscotools_upgrade.host_id
@@ -51,26 +51,26 @@ ciscotools_log('Devices upgrade check' );
 					UPGRADE_STATUS_NEED_COMMIT.",".UPGRADE_STATUS_FORCE_REBOOT_COMMIT.",".UPGRADE_STATUS_ACTIVATING_ERROR.") 
 					 ORDER BY host.id )";
 	}
-	// remove device Down, disabled and non Cisco type
+	// remove device Down, disabled and non Cisco model
 	// validaded only device that are in the upgrade table
 	// except staus: 1,2,3,4,5,11,20,7,8,23,24
 	// or on a specific device
-    $sqlQuery = "SELECT host.id as 'id', host.type as 'type', host.hostname as 'hostname', host.description as 'description', 
+    $sqlQuery = "SELECT host.id as 'id', host.model as 'model', host.hostname as 'hostname', host.description as 'description', 
                 plugin_ciscotools_image.image as 'image', host.status as 'status',
 				plugin_ciscotools_image.command as 'command',
 				plugin_ciscotools_image.regex as 'regex'
                 FROM host 
-				LEFT JOIN plugin_extenddb_model ON host.type = plugin_extenddb_model.model
+				LEFT JOIN plugin_extenddb_model ON host.model = plugin_extenddb_model.model
                 LEFT JOIN plugin_ciscotools_image ON plugin_extenddb_model.id = plugin_ciscotools_image.model_id 
-                WHERE host.type IN (
-                    SELECT plugin_extenddb_model.model FROM plugin_extenddb_model WHERE host.type = plugin_extenddb_model.model
+                WHERE host.model IN (
+                    SELECT plugin_extenddb_model.model FROM plugin_extenddb_model WHERE host.model = plugin_extenddb_model.model
 					AND plugin_extenddb_model.id = plugin_ciscotools_image.model_id
                 ) "
 				. $sqlField;
 				
     $result = db_fetch_assoc($sqlQuery);
-ciscotools_log('upgrade check sql query:'.$sqlQuery );
-ciscotools_log('upgrade check sql answer:'. print_r( $result, true ) );
+//ciscotools_log('upgrade check sql query:'.$sqlQuery );
+//ciscotools_log('upgrade check sql answer:'. print_r( $result, true ) );
 
 	if( sizeof($result) ) {
 		$ret = false;
@@ -93,7 +93,7 @@ ciscotools_log('upgrade check sql answer:'. print_r( $result, true ) );
         $sshResult = ssh_read_stream($stream);
         close_ssh($stream);
 
-ciscotools_log("device: ".$device['description'].' ssh result: '. $sshResult );
+//ciscotools_log("device: ".$device['description'].' ssh result: '. $sshResult );
 		$rules = $device['regex'].'i';
 		$regex = preg_match( $rules, $sshResult, $res );
 		$actualImage = ltrim(trim($res[2], " \""), " \"");
@@ -126,58 +126,19 @@ ciscotools_log("device: ".$device['description'].' Desired Image: '. $device['im
  * Perform a model verification
  * If the query is not successful, the model is not supported
  *
- * @param   string  $type: the device model
+ * @param   string  $model: the device model
  * @return  boolean true if successful, false otherwise
  */
-function ciscotools_upgrade_check_model($type) {
+function ciscotools_upgrade_check_model($model) {
     $sqlQuery = "SELECT plugin_ciscotools_image.image 
 	FROM plugin_ciscotools_image 
 	LEFT JOIN plugin_extenddb_model ON plugin_extenddb_model.id = plugin_ciscotools_image.model_id 
-	WHERE plugin_extenddb_model.model = '$type'";
+	WHERE plugin_extenddb_model.model = '$model'";
     $sqlExec = db_fetch_row_prepared($sqlQuery);
     if(!$sqlExec) return false;
     return true;
 }
 
-/* ==================================================== */
-
-/** ================= CHECK VERSION =================
- * Verify if the image was already installed
- *
- * See if the device has already the version installed
- * with two commands depending of the mode (bundle and install)
- * [Bundle]     perform the 'dir' and 'show boot' commands
- * [Install]    perform the 'dir' and 'more flash:/.installer/install_add_oper.log' commands
- *
- * @param   integer $deviceID:  the ID of the device (host.id)
- * @param   array   $infos:     array containing all device informations from host DB
- * @return  boolean true if successful, false otherwise
- */
- 
- // NOT USED ANYMORE
-function ciscotools_upgrade_check_version($deviceID, $infos) {
-	// See if file is in flash: and set in bootvar
-    $cmds = explode("&", $infos['model']['sshCmds_mode']); // replace | by &
-    $checkCounter = 0;
-    $versionRegex = "/" . $infos['model']['image'] . "/";
-
-    $stream = create_ssh($deviceID);
-    if($stream === false)
-    {
-        ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_SSH_ERROR);
-        return;
-    }
-    
-    foreach($cmds as $index => $cmd)
-    {
-        if(ssh_write_stream($stream, $cmd) === false) return false;
-        $bootVersion = ssh_read_stream($stream);
-        if(preg_match($versionRegex, $bootVersion, $result)) $checkCounter++;
-    }
-    if($checkCounter == sizeOf($cmds)) return false;
-    return true;
-}
-/* ==================================================== */
 
 /** ================= CHECK TFTP =================
  * Check the TFTP server address and the availibility
@@ -211,7 +172,7 @@ function ciscotools_upgrade_check_tftp($deviceID, $tftpAddress)
  * @return  string  'finish' if successful, 'progress' if in progress, 'error' otherwise
  */
 function ciscotools_upgrade_check_upload($infos) {
-ciscotools_log("snmp upload query: " .print_r($infos, true ) );
+//ciscotools_log("snmp upload query: " .print_r($infos, true ) );
 	// Check upload status
 	$uploadStatus = cacti_snmp_walk( $infos['device']['hostname'], $infos['snmp']['snmp_community'], 
 	CISCOTOOLS_SNMP_FLASHCOPY['status'] . $infos['snmp']['session'], 
@@ -219,7 +180,7 @@ ciscotools_log("snmp upload query: " .print_r($infos, true ) );
 	$infos['snmp']['snmp_auth_protocol'], $infos['snmp']['snmp_priv_passphrase'], 
 	$infos['snmp']['snmp_priv_protocol'], $infos['snmp']['snmp_context'] ); 
 
-ciscotools_log("device: ".$infos['device']['description']." snmp upload status: " .print_r($uploadStatus, true ) );
+//ciscotools_log("device: ".$infos['device']['description']." snmp upload status: " .print_r($uploadStatus, true ) );
 
 	if( empty($uploadStatus) ) {
 		$stream = create_ssh($infos['device']['id']);
@@ -233,7 +194,7 @@ ciscotools_log("device: ".$infos['device']['description']." snmp upload status: 
 			return false;
 		}
 		$directory = ssh_read_stream($stream);
-ciscotools_log('device: '.$infos['device']['description']." snmp upload status directory : ". print_r( $directory, true ) );
+//ciscotools_log('device: '.$infos['device']['description']." snmp upload status directory : ". print_r( $directory, true ) );
 		close_ssh($stream);
 		if( stripos( $directory, $infos['model']['image'] ) !== false ) {
 			return;
@@ -447,6 +408,8 @@ ciscotools_log('device: '.$infos['device']['description']." upload snmp walk: ".
 19 : copyProhibited
 */
 
+ciscotools_upgrade_table($infos['device']['id'], 'update', UPGRADE_STATUS_UPLOADING);
+
 	if(empty($uploadStatus) ){
 		ciscotools_upgrade_table($infos['device']['id'], 'update', UPGRADE_STATUS_CHECKING_ERROR);
 		return false;
@@ -461,6 +424,7 @@ ciscotools_log('device: '.$infos['device']['description']." upload snmp walk: ".
         if($uploadStatus[0]['value'] === '1') ciscotools_upgrade_table($infos['device']['id'], 'update', UPGRADE_STATUS_UPLOADING);
         else return false;
     }
+
     return true;
 }
 

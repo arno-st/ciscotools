@@ -107,9 +107,12 @@ function ciscotools_check_upgrade() {
 		if( $old < '1.2.2' ) {
 // add MAC vendor information from :
 /*
+https://macaddress.io/database/macaddress.io-db.json
+
 {"oui":"98:74:DA","isPrivate":false,"companyName":"Infinix mobility Ltd","companyAddress":"RMS 05-15, 13A/F SOUTH TOWER WORLD FINANCE CTR HARBOUR CITY 17 CANTON RD TST KLN HONG KONG HongKong HongKong 999077 HK","countryCode":"HK","assignmentBlockSize":"MA-L","dateCreated":"2017-02-21","dateUpdated":"2017-02-21"}
 */
-			$fp = fopen($config['base_path'] . '/plugins/ciscotools/macaddress.io-db.json', "r");
+//			$fp = fopen($config['base_path'] . '/plugins/ciscotools/macaddress.io-db.json', "r");
+			$fp = fopen('https://macaddress.io/database/macaddress.io-db.json', "r");
 			if( $fp !== false ) {
 				do {
 					$json_data = fgets($fp);
@@ -546,8 +549,10 @@ function ciscotools_config_settings () {
 function ciscotools_device_remove($host_id) {
 	global $config;
     ciscotools_log('Start ciscotools remove: '.print_r($host_id, true) );
-	$sqlQuery = "DELETE FROM plugin_ciscotools_upgrade WHERE plugin_ciscotools_upgrade.host_id =$host_id";
-	$sqlExec = db_execute($sqlQuery);
+	foreach( $host_id as $hostid ) {
+		$sqlQuery = "DELETE FROM plugin_ciscotools_upgrade WHERE plugin_ciscotools_upgrade.host_id =$hostid";
+		$sqlExec = db_execute($sqlQuery);
+	}
 
 	return $host_id;
 }

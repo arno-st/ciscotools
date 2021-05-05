@@ -49,7 +49,7 @@ function ciscotools_upgrade_table($deviceID, $action, $status=UPGRADE_STATUS_PEN
                     $sqlQuery = "INSERT INTO plugin_ciscotools_upgrade (host_id, status, image) VALUES (".$deviceID.", ".$status.", '".$image."')";
                     $sqlExec = db_execute($sqlQuery);
                 }
-                else if((cacti_sizeof($result) == 1) ) //&& ($result[0]['status'] == 'UPGRADE_STATUS_NEED_RECHECK'))
+                else if((cacti_sizeof($result) == 1) )
                 {
                     $sqlQuery = "UPDATE plugin_ciscotools_upgrade SET status=" . $status . ",image='".$image."' " . $sqlWhere;
                     $sqlExec = db_execute($sqlQuery);
