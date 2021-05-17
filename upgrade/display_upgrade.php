@@ -209,6 +209,14 @@ function ciscotools_displayUpgrade() {
 
     if($upgradeExport == "1")
     {
+			// SQL Query
+		$sqlQuery = "SELECT host.id as 'id',
+                host.description as 'description', host.hostname as 'hostname', plugin_ciscotools_upgrade.image as image, plugin_ciscotools_upgrade.status as 'status', host.model as 'model'
+                FROM host, plugin_ciscotools_upgrade
+                WHERE host.id=plugin_ciscotools_upgrade.host_id
+                $sqlWhere";
+		$result = db_fetch_assoc($sqlQuery); // Query result
+
         $filename = upgradeExport($result);
         if($filename === false) header("Location: upgrade.php?action=upgrade");
         else

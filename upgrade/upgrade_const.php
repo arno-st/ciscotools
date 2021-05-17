@@ -52,6 +52,8 @@ if( !defined('UPGRADE_STATUS_PENDING') ) {
 	define( 'UPGRADE_STATUS_NEED_RECHECK', 22 );
 	define( 'UPGRADE_STATUS_FORCE_REBOOT_COMMIT', 23 );
 	define( 'UPGRADE_STATUS_ACTIVATING_ERROR', 24 );
+	define( 'UPGRADE_STATUS_ARCHIVE_EXTRACT', 25 );
+	define( 'UPGRADE_STATUS_NO_SPACE_LEFT', 26 );
 }
 /*
 // Status text depending of status number
@@ -81,6 +83,7 @@ $statusText = array(
     '22'    => 'Recheck',
 	'23'	=> 'Force reboot & commit',
 	'24'	=> 'Activating Error';
+	'25'	=> 'Extracting archive file';
 );
 */
 
@@ -213,8 +216,17 @@ defined('CISCOTLS_UPG_STATUS')
             'name'  => 'Activation Error',
             'desc'  => 'Install Mode Error when activatio of the new version.',
             'color' => 'red'
+        ),
+		UPGRADE_STATUS_ARCHIVE_EXTRACT   => array(
+            'name'  => 'Archive Extract',
+            'desc'  => 'Archive mode: extracting bin file.',
+            'color' => 'orange'
+        ),
+		UPGRADE_STATUS_NO_SPACE_LEFT   => array(
+            'name'  => 'No Space Left',
+            'desc'  => 'No enougth space on device.',
+            'color' => 'red'
         )
-
     ));
 
 // =============================================================================

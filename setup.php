@@ -448,6 +448,20 @@ function ciscotools_config_settings () {
 			"max_length" => 20,
 			'default' => ''
 			),
+		"ciscotools_upg_start_time" => array(
+			"friendly_name" => "Upgrade Start Time",
+			"description" => "When Cacti can start the upgrade process.",
+			"method" => "textbox",
+			"max_length" => 10,
+			'default' => '06:00pm'
+			),
+		"ciscotools_upg_end_time" => array(
+			"friendly_name" => "Upgrade End Time",
+			"description" => "When Cacti should end the upgrade process.",
+			"method" => "textbox",
+			"max_length" => 10,
+			'default' => '06:00am'
+			),
 		'ciscotools_default_can_be_upgraded' => array(
 			'friendly_name' => 'Default Can it be upgraded',
 			'description' => 'Enable if the device can be upgraded without human intervention.',
@@ -706,11 +720,35 @@ function ciscotools_poller_bottom () {
 	$pollerIntervalUpgrade =  read_config_option('ciscotools_upgrade_check_periode');
 	$lastPoller = read_config_option('ciscotools_upgrade_lastPoll'); // See when was the last poll for an upgrade
 
-	if((time() - $lastPoller) <= $pollerIntervalUpgrade) {
-		ciscotools_log("Upgrade: time: " . time() . " | lp: " . $lastPoller . " | poller: " . $pollerIntervalUpgrade 
-		. " | diff: " . (time() - $lastPoller));
-	}
-	else {
+
+	// check if we are inside the upgrade windows
+	$upg_start_time = date('Y-m-d H:i', strtotime(read_config_option('ciscotools_upg_start_time')));
+	$upg_end_time = date('Y-m-d', strtotime('+1 day')) . ' '. date('H:i', strtotime(read_config_option('ciscotools_upg_end_time')) );
+	$cur_time = date('Y-m-d H:i');
+
+	// then do the math
+	$proceedupgrade = true; // value to store the action to be taken for the upgrade process
+	ciscotools_log('start: '.$upg_start_time);
+	ciscotools_log('now: '.$cur_time );
+	ciscotools_log('end: '.$upg_end_time);
+	if( $cur_time < $upg_start_time || $cur_time > $upg_end_time ) {
+		ciscotools_log('Outside Upgrade windows' );
+		$proceedupgrade = false;
+	} else ciscotools_log('Inside Upgrade windows' );
+
+	// Query to check if devices are in queue, and need upgrade processing
+	$sqlQuery = "SELECT count(id) FROM plugin_ciscotools_upgrade WHERE status IN ('"
+				."','".UPGRADE_STATUS_PENDING
+				."','".UPGRADE_STATUS_CHECKING
+				."','".UPGRADE_STATUS_UPLOADING
+				."','".UPGRADE_STATUS_ACTIVATING
+				."','".UPGRADE_STATUS_REBOOTING
+				."','".UPGRADE_STATUS_FORCE_REBOOT_COMMIT
+				."')";
+	$queryQueue = db_fetch_cell_prepared($sqlQuery);
+ciscotools_log('Nb device to upgrade: '.$queryQueue);
+
+	if( ($queryQueue > 0) || ((time() - $lastPoller) > $pollerIntervalUpgrade) ) {
 		$upgradeCmdString = trim(read_config_option('path_php_binary'));
 		// If its not set, just assume its in the path
 		if (trim($upgradeCmdString) == '')
@@ -724,7 +762,11 @@ function ciscotools_poller_bottom () {
 			cacti_log('Upgrade is running', false, 'CISCOTOOLS');
 		}
 		set_config_option('ciscotools_upgrade_lastPoll', time()); // Set the last poll for an upgrade check
+	} else {
+		ciscotools_log("Upgrade: time: " . time() . " | lp: " . $lastPoller . " | poller: " . $pollerIntervalUpgrade 
+		. " | diff: " . (time() - $lastPoller));
 	}
+
 
 	//************* Backup Poller
 	$poller_interval = read_config_option('ciscotools_check_backup');

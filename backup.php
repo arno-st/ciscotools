@@ -60,10 +60,10 @@ function ciscotools_backup($deviceid) {
 	
 	if ( $console_type == 1 ) {
 		if ( ssh_write_stream($stream, 'sh start') === false ) return;
-		$data = ssh_read_stream($stream);
+		$data = ssh_read_stream($stream, '');
 	} else {
 		if ( telnet_write_stream($stream, 'sh start') === false ) return;
-		$data = telnet_read_stream($stream);
+		$data = telnet_read_stream($stream, '');
 	}
 	if( $data === false ){
 		ciscotools_log( 'Erreur can\'t read sh start');

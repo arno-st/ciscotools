@@ -82,7 +82,12 @@ function ciscotools_upgrade_step_one($deviceID)
     }
 	
     // IMAGE UPLOAD
-    ciscotools_upgrade_upload_image($deviceID, $infos, $tftpAddress);
+ciscotools_log('device: '.$infos['device']['description']." info: ".print_r($infos, true) );
+	if($infos['model']['mode'] == 'archive') {
+        ciscotools_upgrade_delete_images($infos); // Delete old images
+
+		ciscotools_upgrade_upload_archive($deviceID, $infos, $tftpAddress);
+	} else ciscotools_upgrade_upload_image($deviceID, $infos, $tftpAddress);
     return true;
 }
 
@@ -162,7 +167,6 @@ ciscotools_log("device: ".$infos['device']['description']." Install status : ".p
         else ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_NEED_COMMIT);
     } else if($infos['model']['mode'] == 'archive') {
 		// IE2000 or IE3000 serie
-        ciscotools_upgrade_delete_images($infos); // Delete old images
         $stream = create_ssh($deviceID);
         if($stream === false)
         {
@@ -170,26 +174,14 @@ ciscotools_log("device: ".$infos['device']['description']." Install status : ".p
             return false;
         }
 
-        if(ssh_write_stream($stream, "wr") === false) return false;
-        ssh_read_stream($stream);
-		// activate the new version
-        if(ssh_write_stream($stream, "archive extract flash:" . $infos['model']['image']) === false) return false;
-        $installStatus = ssh_read_stream($stream);
-ciscotools_log("device: ".$infos['device']['description']." Archive status : ".print_r($installStatus, true) );
-		if( stripos($installStatus, 'INSTALL-3-OPERATION_ERROR_MESSAGE' ) !== false ) {
-			ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_ACTIVATING_ERROR);
-			return false;
-		}
-
-        if($infos['device']['can_be_rebooted'] === 'on') ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_ACTIVATING);
-        else ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_NEED_COMMIT);
+		// Do not reboot automaticaly, extract need a lot of time
+		ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_NEED_REBOOT);
 	}
     return true;
 }
 
 /** ================= STEP THREE =================
  * Install mode: activating the new image
- * Bundle mode: reboot (if $force is true)
  *
  * Perform an activation of the new image through SNMP
  *
@@ -341,13 +333,19 @@ ciscotools_log("reboot: ". $infos['device']['description']);
         // SSH REBOOT
         if(ssh_write_stream($stream, "reload\r\n") === false) return false;
         ssh_read_stream($stream);
-	} else if($infos['model']['mode'] === 'install')
-    {   
+	} else if($infos['model']['mode'] === 'install') {   
 		// IOS-XE like Cisco 9x00
         if(ssh_write_stream($stream, "install activate prompt-level none") === false) return false;
         $activate = ssh_read_stream($stream);
 ciscotools_log("device: ".$infos['device']['description'].' install activate return: ', print_r($activate, true) );
-		}
+	} else if($infos['model']['mode'] == 'archive') {   
+		// archive mode
+        if(ssh_write_stream($stream, "wr") === false) return false; // Write memory
+        ssh_read_stream($stream);
+        // SSH REBOOT
+        if(ssh_write_stream($stream, "reload\r\n") === false) return false;
+        ssh_read_stream($stream);
+	}
 	return true;
 }
 ?>

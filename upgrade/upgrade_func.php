@@ -180,8 +180,8 @@ function ciscotools_upgrade_check_upload($infos) {
 	$infos['snmp']['snmp_auth_protocol'], $infos['snmp']['snmp_priv_passphrase'], 
 	$infos['snmp']['snmp_priv_protocol'], $infos['snmp']['snmp_context'] ); 
 
-//ciscotools_log("device: ".$infos['device']['description']." snmp upload status: " .print_r($uploadStatus, true ) );
-
+ciscotools_log("device: ".$infos['device']['description']." snmp upload status: " .print_r($uploadStatus, true ) );
+/*
 	if( empty($uploadStatus) ) {
 		$stream = create_ssh($infos['device']['id']);
 		if($stream === false)
@@ -200,8 +200,8 @@ function ciscotools_upgrade_check_upload($infos) {
 			return;
 		} 
 		return false;
-		
 	}
+	*/
 
 /*
  Status:
@@ -226,7 +226,9 @@ function ciscotools_upgrade_check_upload($infos) {
 18 : copyInvalidSignature
 19 : copyProhibited
 */
-	if($uploadStatus[0]['value'] === '1') return 'progress';
+	if($uploadStatus[0]['value'] === '1'){
+		return 'progress';
+	}
     else if($uploadStatus[0]['value'] === '2')
     {
         ciscotools_log("[DEBUG] Upgrade: upload succeed on ". $infos['device']['description'] . "!");
@@ -376,7 +378,7 @@ function ciscotools_upgrade_upload_image($deviceID, $infos, $tftpAddress) {
     // Begin Upload
 	ciscotools_upgrade_snmp_set($infos['snmp']['snmp_version'], $infos['device']['hostname'], $snmpEntryStatus . $infos['snmp']['session'], "i", "1", $infos['snmp']); 
 	
-    sleep(2); // Wait - Do not change this line!
+    sleep(5); // Wait - Do not change this line!
 
 	// query the status of the transfert order
 	$uploadStatus = cacti_snmp_walk( $infos['device']['hostname'], $infos['snmp']['snmp_community'], $snmpStatus . $infos['snmp']['session'], 
@@ -384,6 +386,7 @@ function ciscotools_upgrade_upload_image($deviceID, $infos, $tftpAddress) {
 	$infos['snmp']['snmp_auth_protocol'], $infos['snmp']['snmp_priv_passphrase'], 
 	$infos['snmp']['snmp_priv_protocol'], $infos['snmp']['snmp_context'] ); 
 ciscotools_log('device: '.$infos['device']['description']." upload snmp walk: ".print_r($uploadStatus, true) );
+// to many empty array
  /*
  Status:
 0 : copyOperationPending
@@ -428,6 +431,43 @@ ciscotools_upgrade_table($infos['device']['id'], 'update', UPGRADE_STATUS_UPLOAD
     return true;
 }
 
+/** ================= ARCHIVE UPLOAD =================
+ * Upload of the new archive on the device and xtract it
+ * 
+ *
+ * @param   integer $deviceID:      the ID of the device (host.id)
+ * @param   array   $infos:         array containing all device informations
+ * @param   string  $tftpAddress:   the IPv4 or IPv6 address of the TFTP server
+ * @return  boolean true if successful, false otherwise
+ */
+function ciscotools_upgrade_upload_archive($deviceID, $infos, $tftpAddress) {
+	ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_ARCHIVE_EXTRACT);
+	
+    $stream = create_ssh($infos['device']['id']);
+    if($stream === false)
+    {
+        ciscotools_upgrade_table($infos['device']['id'], 'update', UPGRADE_STATUS_SSH_ERROR);
+        return false;
+    }
+
+	if(ssh_write_stream($stream, "archive tar /xtract tftp://". $tftpAddress ."/" . $infos['model']['image'] . " flash:") === false) return false;
+	
+	// pool until end of upload 'extracting info'
+	do {
+		$installStatus = ssh_read_stream($stream);
+ciscotools_log("device: ".$infos['device']['description']." Archive status : ".print_r($installStatus, true) );
+		if( $installStatus === false ) {
+			ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_IMAGE_INFO_ERROR);
+			break;
+		} else if( strpos($installStatus, 'Not enough space')!== false ) {
+			ciscotools_upgrade_table($deviceID, 'update', UPGRADE_STATUS_NO_SPACE_LEFT );
+			break;
+		}
+	}
+	while( stripos($installStatus, 'extracting info' ) !== false && $installStatus !== false);
+
+}
+
 /** ================= IMAGES ERASE =================
  * Perform a deletion of the old installed images.
  *
@@ -453,12 +493,14 @@ function ciscotools_upgrade_delete_images($infos)
 	$result = explode('/', $oldImage );
 	if( count($result) ) {
 		ssh_write_stream($stream, 'delete /f /r ' . $result[0]);
-		ssh_read_stream($stream);
+		$readstream = ssh_read_stream($stream);
+ciscotools_log('delete file device: '.$infos['device']['id'].' '. print_r($readstream, true));
 	}
 
     if(ssh_write_stream($stream, 'dir') === false) return false;
     $directory = ssh_read_stream($stream);
 
+ciscotools_log('delete file dir: '.$infos['device']['id'].' '. print_r($directory, true));
 	// then delete other file
     $regexImages = '/[a-zA-Z0-9-.]{0,}.bin/';
     preg_match_all($regexImages, $directory, $result);
@@ -481,6 +523,4 @@ ciscotools_log('device: '.$infos['device']['id'].' delete: '.$value);
     close_ssh($stream);
     return true;
 }
-
-/* ======================================================================================== */
 ?>
