@@ -722,9 +722,9 @@ function ciscotools_poller_bottom () {
 
 
 	// check if we are inside the upgrade windows
-	$upg_start_time = date('Y-m-d H:i', strtotime(read_config_option('ciscotools_upg_start_time')));
-	$upg_end_time = date('Y-m-d', strtotime('+1 day')) . ' '. date('H:i', strtotime(read_config_option('ciscotools_upg_end_time')) );
-	$cur_time = date('Y-m-d H:i');
+	$upg_start_time = date('Y-m-d H:i:s', strtotime(read_config_option('ciscotools_upg_start_time')));
+	$upg_end_time = date('Y-m-d', strtotime('+1 day')) . ' '. date('H:i:s', strtotime(read_config_option('ciscotools_upg_end_time')) );
+	$cur_time = date('Y-m-d H:i:s');
 
 	// then do the math
 	$proceedupgrade = true; // value to store the action to be taken for the upgrade process
