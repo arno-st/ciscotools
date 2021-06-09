@@ -68,6 +68,11 @@ function ciscotools_displaymac() {
 	/* ================= input validation ================= */
 	$sort_column = get_request_var('sort_column');
 	$sort_direction = get_request_var('sort_direction');
+    // Clean macExport
+    if(isset_request_var("macExport"))
+    {
+        set_request_var("macExport", sanitize_search_string(get_request_var("macExport")));
+    }
 /*
 table plugin_ciscotools_mactrack
 	id
@@ -87,6 +92,7 @@ table plugin_ciscotools_mactrack
 	$mac_address       = str_replace(array(':','-','.'), '', get_request_var_request("mac_address"));
 	$ip_address       = get_request_var_request("ip_address");
 	$description       = get_request_var_request("description");
+	$macExport  = get_request_var("macExport");
 	
 	if ($switch != '') {
 		$sql_where .= " AND " . "host.description LIKE '%$switch%'";
@@ -139,11 +145,50 @@ table plugin_ciscotools_mactrack
 			LIMIT " . $sql_limit;
 	$result = db_fetch_assoc($sql_query); // query result is one entry par backup
 
+    if($macExport == "1") {
+			// SQL Query
+		$sqlQuery = "SELECT host.id as 'id', 
+			host.description as 'switch', 
+			mac.mac_address as 'mac', mac.ip_address as 'ip', mac.vlan_name as 'vlan_name', mac.vlan_id as 'vlan_id', 
+			mac.port_index as 'intf_index', mac.description as 'description', intf.field_value as 'intf_name', 
+			mac.date as 'date', oui.companyname as 'oui'
+			FROM plugin_ciscotools_mactrack as mac 
+			INNER JOIN host ON host.id=mac.host_id
+			INNER JOIN host_snmp_cache as intf ON mac.host_id=intf.host_id
+            INNER JOIN plugin_ciscotools_oui as oui ON SUBSTRING(mac.mac_address, 1, 6)=oui.oui
+			WHERE mac.port_index=intf.snmp_index
+			AND intf.field_name='ifDescr'
+			$sql_where";
+		$result = db_fetch_assoc($sqlQuery); // Query result
+ciscotools_log('Export query1: '.$sql_query);
+
+        $filename = macExport($result);
+        if($filename === false) header("Location: ciscotools_tab.php?action=display_mac");
+        else
+        {
+            $url = $filename;
+            $files = array_diff(scandir(__DIR__), array('.', '..'));
+            $regexTime = "/cacti-exportMac-(\d{10}).csv/";
+            if(preg_match($regexTime, $filename, $defTime)) $defTime = $defTime[1];
+            foreach($files as $fname)
+            {
+                if(preg_match($regexTime, $fname, $time))
+                {
+                    if($time[1] < $defTime)
+                    {
+                        unlink($config['base_path'] . "/plugins/ciscotools/" . $time[0]);
+                    }
+                }
+                else continue;
+            }
+        }
+        header("Location: " . $url);
+    }
 	?>
 	
 	<script type="text/javascript">
 	<!--
-	
+
 	function applyFilter() {
 		strURL  = '?header=false&action=display_mac';
 		strURL += '&switch=' + $('#switch').val();
@@ -159,6 +204,18 @@ table plugin_ciscotools_mactrack
 		strURL  = 'ciscotools_tab.php?action=display_mac&header=false&clear=1';
 		loadPageNoHeader(strURL);
 	}
+
+    function macExport()
+    {
+		strURL  = '?header=false&action=display_mac';
+		strURL += '&switch=' + $('#switch').val();
+		strURL += '&ip_address=' + $('#ip_address').val();
+		strURL += '&mac_address=' + $('#mac_address').val();
+		strURL += '&description=' + $('#description').val();
+		strURL += '&rows=' + $('#rows').val();
+		strURL += "&macExport=1";   // Add parameter
+		document.location = strURL;     // Load URL
+    }
 	
 	-->
 	</script>
@@ -216,6 +273,7 @@ table plugin_ciscotools_mactrack
 					<td nowrap style='white-space: nowrap;'>
 						<input type="submit" value="Go" title="Set/Refresh Filters">
 						<input type='button' value="Clear" id='clear' onClick='clearFilter()' title="Reset fields to defaults">
+                        <input type='button' class='ui-button ui-corner-all ui-widget' id='macExport' value='<?php print __esc('Export');?>' title='<?php print __esc('Export Table');?>'>
 					</td>
 				</tr>
 			</table>
@@ -292,6 +350,64 @@ table plugin_ciscotools_mactrack
 	
 	bottom_footer();
 
+}
+
+/**
+* +-----------------+
+* | EXPORT FUNCTION |
+* +-----------------+
+* @param array $devices: contains all informations about devices
+* @return string $filename if successful, false otherwise
+*/
+function macExport($devices) {
+    global $config;
+    if(cacti_sizeof($devices) > 0)
+    {   // Create array with IDs
+        $ids = array();
+        foreach($devices as $d) array_push($ids, $d['id']);
+        $ids = implode(",", array_unique($ids, SORT_REGULAR ) );
+        
+        // SQL Query to catch all useful infos
+        $sqlQuery = "SELECT host.id as 'id', 
+			host.description as 'switch', 
+			mac.mac_address as 'mac', mac.ip_address as 'ip', mac.vlan_name as 'vlan_name', mac.vlan_id as 'vlan_id', 
+			mac.port_index as 'intf_index', mac.description as 'description', intf.field_value as 'intf_name', 
+			mac.date as 'date', oui.companyname as 'oui'
+			FROM plugin_ciscotools_mactrack as mac 
+			INNER JOIN host ON host.id=mac.host_id
+			INNER JOIN host_snmp_cache as intf ON mac.host_id=intf.host_id
+            INNER JOIN plugin_ciscotools_oui as oui ON SUBSTRING(mac.mac_address, 1, 6)=oui.oui
+			WHERE mac.port_index=intf.snmp_index
+			AND intf.field_name='ifDescr' 
+			AND host.id IN (" . $ids . ")";
+ciscotools_log('Export query2: '.$sqlQuery);
+
+        $result = db_fetch_assoc($sqlQuery);
+        if($result === false) return false;
+
+        $filename = "cacti-exportMac-" . time() . ".csv";   // Set filename with current time
+        $fp = fopen("plugins/ciscotools/" . $filename, "w");    // File location in current directory
+        $csv = "";
+
+        // Put data in $csv variable
+        $flag = false;
+        foreach($result as $line)
+        {
+            if(!$flag)
+            {
+                $csv .= implode(",", array_keys($line)) . "\r\n";
+                $flag = true;
+            }
+            array_walk($line, __NAMESPACE__ . '\formatData');
+            $csv .= implode(",", array_values($line)) . "\r\n";
+        }
+
+        // Put data in file
+        fwrite($fp, $csv);
+        fclose($fp);
+        return $filename;
+    }
+    else return false;
 }
 
 ?>

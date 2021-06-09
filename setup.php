@@ -729,9 +729,11 @@ function ciscotools_poller_bottom () {
 	// then do the math
 	$proceedupgrade = true; // value to store the action to be taken for the upgrade process
 	ciscotools_log('start: '.$upg_start_time);
-	ciscotools_log('now: '.$cur_time );
+	ciscotools_log('cur: '.$cur_time );
 	ciscotools_log('end: '.$upg_end_time);
-	if( $cur_time < $upg_start_time || $cur_time > $upg_end_time ) {
+	ciscotools_log('test1 '.($cur_time < $upg_start_time) );
+	ciscotools_log('test2 '.($cur_time > $upg_end_time) );
+	if( ($cur_time < $upg_start_time && $cur_time > $upg_end_time) ) {
 		ciscotools_log('Outside Upgrade windows' );
 		$proceedupgrade = false;
 	} else ciscotools_log('Inside Upgrade windows' );

@@ -25,6 +25,7 @@ chdir('../../');
 include_once('./include/auth.php');
 
 set_default_action('display_mac');
+ciscotools_log('request: '.get_request_var('action'));
 
 switch(get_request_var('action')) {
 	case 'diff':
