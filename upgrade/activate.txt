@@ -1,0 +1,5 @@
+!BEGIN
+!save before activating
+do wr
+!activate without prompt
+install activate prompt-level none
