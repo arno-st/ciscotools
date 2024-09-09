@@ -27,4 +27,33 @@
 
 ----[ Changelog
 
-1.0.0 Add 3 fields: login, password, console type (ssh, telnet), and the upload of new IOS based a snmpSysObjId via tftp or snmp
+1.0.0 Add 3 fields: login, password, console type (ssh, telnet), and manage to do a backup of the switch via the console port
+1.1.0 Added the functionality of doing an upgrade of the switch, and the upload of new IOS based a snmpSysObjId via tftp or snmp
+1.2.0 Added the MacTrack function
+1.2.1 Added sort function to display_backup
+1.2.2 Added MAC OUI database
+1.2.3 Added more detailed choice for guest access on CiscoTools tab
+1.2.4 Addapted the mactracking to use snmp V3
+1.2.5 When click on the version of the backup, it exported as text file
+1.2.6 Add mactrack specific logging, change some way on how it works
+1.2.7 Change DB to exclude image type, take it from Extendb
+1.2.8 chamge host.type to host.model to be coherent between plugin
+1.2.9 Added time limit when an upgrade can be done
+1.2.10 Added transfert mode copy with SSH, and size for the image (only for SSH copy)
+1.2.11 remove ciscotools_default_upgrade_type useless
+1.2.12 Bug correction on display image, request size for all type, instead of just for copy
+1.3.0 Add CLI command tab (search for string in Diff backup all or some device), send command to switch depending of model)
+1.3.1 Remove device from backup table when it's deleted
+1.3.2 Add filter for Vlan name or ID
+1.3.3 Export on schedule of the table (`plugin_ciscotools_backup`) of the config (take the last one), config possible of where to export it, and it's backup at evrey change, the old one is replaced, only the last one is exported. All config are kept on the DB as now.
+1.3.4 Display orphan backup
+1.3.5 Add option to export backup from DB to a external server, via ftp, sftp, scp
+1.3.6 Add option to negate a search from the config
+1.4.0 Adapt the objet host due to change in extenddb, where model and serial_no is on another table
+1.4.1 Change OUI type into plugins_ciscotools_oui to 12 char instead of 8
+1.4.2 Add link to EfficientIP to have the flag Static IP or not, so test if efficientIP plugin is present
+1.4.3 Add a backp_log function, due to some issue with the autmatic backup function, it's possible now to have the log only for the backup
+1.4.4 Mactrack: Change the way the nb of process is recorded, it's only after the process is started that the DB is updated
+1.4.5 Change the way the version is tested, new regex on the WebUI, and new rule inside 'ciscotools_upgrade_device_check'
+1.4.6 Change the type of the row Diff in plugin_ciscotools_backup from TEXT too MEDIUMTEXT 
+1.4.7 Add logging for ugrade only

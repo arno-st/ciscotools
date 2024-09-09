@@ -1,10 +1,10 @@
 [info]
 name = ciscotools
-version = 1.0.0
-longname = Host Tools
+version = 1.4.7
+longname = Cisco Tools
 author = Arno Streuli
 email = astreuli@gmail.com
 homepage = http://www.cacti.net
-compat = 1.0.0
+compat = 1.1.0
 requires = extenddb
 capabilities = online_view:1, online_mgmt:1, offline_view:0, offline_mgmt:0, remote_collect:0
